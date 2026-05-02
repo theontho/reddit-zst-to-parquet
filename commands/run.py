@@ -1,12 +1,16 @@
 import logging
 import os
 import shutil
-import sys
 import time
 from pathlib import Path
 
 from core import config, logger
-from core.processor import cleanup_own_claims, get_files_to_process, initialize_log_entries, process_file
+from core.processor import (
+    cleanup_own_claims,
+    get_files_to_process,
+    initialize_log_entries,
+    process_file,
+)
 from core.utils import (
     cleanup_orphan_temp_dirs,
     format_size,
@@ -24,7 +28,6 @@ from transfer.rsync_ssh_transfer import RsyncSshTransferHandler
 def run_conversion_loop():
     """Main function to coordinate the remote Zstandard to Parquet conversion process."""
     # --- Configuration Validation ---
-    from core import config
     config.validate_config(config.config_data)
 
     # --- Basic Setup ---
@@ -215,7 +218,7 @@ def run_conversion_loop():
     final_status = "Complete"
     if consecutive_failures >= config.MAX_CONSECUTIVE_FAILURES:
         final_status = f"Terminated Early ({consecutive_failures} consecutive failures)"
-    
+
     logging.info(
         f"Processing loop complete. Processed this run: {processed_count}, "
         f"Skipped this run: {skipped_count}, Failed this run: {failed_count}. "

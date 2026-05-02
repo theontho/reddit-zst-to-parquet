@@ -45,7 +45,7 @@ To run the converter on a single machine using local files:
 
 2.  **Run**:
     ```bash
-    uv run main.py run
+    uv run reddit-zst-to-parquet run
     ```
 
 ---
@@ -57,7 +57,7 @@ For distributed processing, set `transfer.method` to `ftp`, `nfs`, or `rsync` an
 ### Monitoring the Fleet
 You can generate a comprehensive progress report and audit the health of the fleet from any node:
 ```bash
-uv run main.py report
+uv run reddit-zst-to-parquet report
 ```
 This tool:
 - Audits all remote manifests to calculate weighted completion.
@@ -70,7 +70,7 @@ This tool:
 
 ## Project Structure
 
-- `main.py`: The CLI entry point with subcommands (`run`, `report`, `bench`, `verify`, `manifests`).
+- `reddit-zst-to-parquet`: The CLI entry point with subcommands (`run`, `report`, `bench`, `verify`, `manifests`).
 - `core/`: Shared logic, configuration, and processing coordination.
 - `commands/`: Subcommand implementations.
 - `transfer/`: Handlers for different protocols (FTP, Rsync, NFS, Local).

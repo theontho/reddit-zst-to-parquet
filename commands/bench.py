@@ -4,7 +4,7 @@ import shutil
 import time
 from typing import Any
 
-from core import config, logger
+from core import config
 from core.processor import process_file
 from core.utils import get_machine_metadata
 from transfer.base_transfer import TransferHandler
@@ -88,18 +88,18 @@ def run_storage_benchmark():
     # A large sized file for testing
     test_file = "RC_2011-09.zst"
     ssd_path = os.path.expanduser("~/reddit_parquet_benchmark_ssd")
-    
+
     print("\n" + "=" * 70)
     print(f"STORAGE PERFORMANCE BENCHMARK: {test_file}")
     print("=" * 70)
 
     res_ssd = run_benchmark(test_file, ssd_path, "Local Temp Directory")
-    
+
     if res_ssd:
         print(f"\nResults for: {res_ssd['label']}")
         print(f"  Total Transaction Time: {res_ssd['total_duration']}s")
         for stage, data in res_ssd["stages"].items():
             speed = f" ({data['speed_mb_s']} MB/s)" if "speed_mb_s" in data else ""
             print(f"    - {stage.capitalize():<10}: {data['duration_sec']:>8}s{speed}")
-    
+
     print("\n" + "=" * 70)

@@ -7,8 +7,8 @@ from pathlib import Path
 import humanize
 
 from core import config
+
 from .base_transfer import TransferHandler
-from core.utils import format_size
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ class LocalTransferHandler(TransferHandler):
 
         try:
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # If a file/link already exists at the destination, remove it
             if dest_path.exists() or dest_path.is_symlink():
                 dest_path.unlink()
@@ -142,7 +142,7 @@ class LocalTransferHandler(TransferHandler):
         try:
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             file_size = local_source.stat().st_size
-            
+
             logger.info(f"Moving '{local_path}' to final path '{dest_path}'...")
             start_time = time.monotonic()
             # Use move since it's the final step

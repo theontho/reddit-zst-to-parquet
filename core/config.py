@@ -109,7 +109,7 @@ load_toml_config(LOCAL_CONFIG, config_data)
 # --- Validation (Fail Fast) ---
 def validate_config(config_data):
     method = config_data["transfer"]["method"].lower()
-    
+
     # Common required remote info (for multi-node or remote systems)
     if method in ["rsync", "ftp", "nfs"]:
         required_remote = ["host", "user", "directory"]
@@ -119,7 +119,7 @@ def validate_config(config_data):
 
     if method == "ftp" and not config_data["ftp"].get("password"):
         raise ValueError("FTP method selected but ftp.password is missing in configuration.")
-        
+
     if method == "local" and not config_data["remote"].get("directory"):
         raise ValueError("Local method selected but remote.directory (used as local source) is missing.")
 

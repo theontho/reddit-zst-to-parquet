@@ -34,7 +34,6 @@ from core.config import (
     ZSTD_PATH,
     ZSTD_TERMINATION_TIMEOUT_SECONDS,
 )
-from core.schema_parser import build_arrow_schema
 
 # --- Constants ---
 DEFAULT_CHUNK_SIZE: int = CHUNK_SIZE

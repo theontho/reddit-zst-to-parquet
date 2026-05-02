@@ -1,16 +1,15 @@
 import json
 import os
-import sys
 
 import fsspec
 import pyarrow.parquet as pq
+
 from core import config
 from transfer.base_transfer import TransferHandler
 from transfer.ftp_transfer import FtpTransferHandler
 from transfer.local_transfer import LocalTransferHandler
 from transfer.nfs_transfer import NfsTransferHandler
 from transfer.rsync_ssh_transfer import RsyncSshTransferHandler
-
 
 _FTP_FS = None
 
@@ -42,7 +41,7 @@ def run_verification():
     parquet_files = [f for f in all_parquet if f.startswith("new-")]
 
     if not parquet_files:
-        print(f"No new-*.parquet files found.")
+        print("No new-*.parquet files found.")
         return
 
     print(f"Found {len(parquet_files)} files to verify.")
@@ -80,7 +79,7 @@ def run_verification():
             # This is a bit complex for non-FTP methods, but let's assume FTP for now as per original script
             # or implement a generic 'open_remote' in handlers if we want it truly modular.
             # For now, we'll keep the FTP-centric verification or use local if method is local.
-            
+
             if method == "ftp":
                 global _FTP_FS
                 if _FTP_FS is None:
@@ -92,11 +91,11 @@ def run_verification():
                         port=config.FTP_PORT,
                         timeout=config.FTP_TIMEOUT_SECONDS,
                     )
-                
+
                 f_path = os.path.join(config.REMOTE_DIR, filename)
                 if not f_path.startswith("/"):
                     f_path = "/" + f_path
-                    
+
                 # Use a block cache to prevent multiple small FTP RETR commands
                 # for metadata reads, which overloads the server.
                 with _FTP_FS.open(f_path, "rb", cache_type="readahead") as f:

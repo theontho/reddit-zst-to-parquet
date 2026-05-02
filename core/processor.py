@@ -14,8 +14,8 @@ from typing import Any
 from core import logger  # Use logger module for log functions
 from core.config import CONVERSION_TEMP_BASE_DIR
 from core.converter import convert_to_parquet
-from transfer.base_transfer import TransferHandler
 from core.utils import cleanup_local_temp, update_terminal_title
+from transfer.base_transfer import TransferHandler
 
 
 def initialize_log_entries(log_data: dict, remote_zst_files: set[str]) -> bool:

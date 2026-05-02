@@ -7,6 +7,7 @@ import os
 import sys  # Add sys import for stdout manipulation
 import time
 from ftplib import FTP, FTP_TLS, error_perm
+
 from core.config import (
     # FTP doesn't have built-in retries/timeouts like rsync args, need manual implementation
     FTP_HOST,
@@ -20,6 +21,7 @@ from core.config import (
     USE_FTPS,
 )
 from core.utils import format_size, format_speed
+
 from .base_transfer import TransferHandler
 
 # TODO: Add FTP specific configuration to config.py (e.g., FTP_PORT, FTP_PASSIVE, FTP_PASSWORD/use_netrc)

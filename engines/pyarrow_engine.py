@@ -273,13 +273,14 @@ def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> 
 
 import argparse
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="PyArrow ZST to Parquet converter.")
     parser.add_argument("input_path", help="Path to the input .zst file.")
     parser.add_argument("-o", "--output", dest="output_path", help="Path to the output .parquet file.")
-    
+
     args = parser.parse_args()
-    
+
     convert_file(args.input_path, args.output_path)
 
 

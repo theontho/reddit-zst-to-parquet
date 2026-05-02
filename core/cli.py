@@ -9,9 +9,9 @@ import argparse
 import logging
 import sys
 
-from core import config
-from commands.run import run_conversion_loop
 from commands.report import run_fleet_report
+from commands.run import run_conversion_loop
+from core import config
 
 
 def main():
@@ -23,8 +23,8 @@ def main():
     # 'run' command
     run_parser = subparsers.add_parser("run", help="Start the conversion processing loop.")
     run_parser.add_argument(
-        "--method", 
-        choices=["local", "ftp", "rsync", "nfs"], 
+        "--method",
+        choices=["local", "ftp", "rsync", "nfs"],
         help="Override the transfer method (default from config)"
     )
 
@@ -46,7 +46,7 @@ def main():
     if args.command == "run":
         if args.method:
             config.TRANSFER_METHOD = args.method
-        
+
         try:
             run_conversion_loop()
         except KeyboardInterrupt:

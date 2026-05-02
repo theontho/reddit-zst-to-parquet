@@ -14,8 +14,9 @@ from core.config import (
     RSYNC_RETRY_DELAY_SECONDS,
     RSYNC_TIMEOUT_SECONDS,
 )
-from .base_transfer import TransferHandler
 from core.utils import format_size, format_speed
+
+from .base_transfer import TransferHandler
 
 
 class RsyncSshTransferHandler(TransferHandler):

@@ -1,7 +1,5 @@
-import io
 import json
 import os
-import sys
 
 import pyarrow.parquet as pq
 
@@ -34,7 +32,7 @@ def run_generate_manifests(force=False):
     print(f"Connecting via {method.upper()}...")
     try:
         zst_files, all_parquet, other_files = handler.list_remote_files()
-        
+
         # Filter for Parquet files
         parquet_files = [f for f in all_parquet if f.endswith(".parquet")]
         print(f"Found {len(parquet_files)} parquet files.")
@@ -46,10 +44,10 @@ def run_generate_manifests(force=False):
 
             print(f"Generating manifest for {filename}...")
             try:
-                # We need a way to read the parquet metadata. 
+                # We need a way to read the parquet metadata.
                 # For Local, it's easy. For others, we might need to download or use fsspec.
                 # To keep it simple and robust, we'll download to a temp file if not local.
-                
+
                 # Download to a temporary file for analysis (symlinked if local)
                 import tempfile
                 with tempfile.NamedTemporaryFile(suffix=".parquet") as tmp:
@@ -74,13 +72,13 @@ def run_generate_manifests(force=False):
 
                 # Upload manifest
                 manifest_json = json.dumps(manifest, indent=2)
-                
+
                 # Write to temp file first for upload
                 import tempfile
                 with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
                     tmp.write(manifest_json)
                     tmp_name = tmp.name
-                
+
                 try:
                     success, _ = handler.upload_file(tmp_name, manifest_name)
                     if success:

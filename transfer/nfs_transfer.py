@@ -7,8 +7,9 @@ from pathlib import Path
 import humanize
 
 from core import config  # Import configuration
-from .base_transfer import TransferHandler
 from core.utils import format_size  # Import utility for size formatting
+
+from .base_transfer import TransferHandler
 
 # Use logger configured in main.py
 logger = logging.getLogger(__name__)
