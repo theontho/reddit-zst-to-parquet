@@ -1,8 +1,11 @@
 # Reddit ZST to Parquet
 
-> **Warning**: This toolset is currently somewhat rough around the edges. However, it worked well enough to successfully convert my entire multi-terabyte download. Use with care.
+> [!WARNING]
+> This toolset is currently somewhat rough around the edges. However, it worked well enough to successfully convert my entire multi-terabyte download up to 2026-03 of comments and submissions. An AI agent can probably fix any rough edges that don't work well.  If you can get an 8TB SSD drive pool that will locally connect to your computer, this will probably be a much easier thing to do than to managing a semi-flakey NAS FTP server and multiple machines doing processing on the zst files.  If that is the case I would tell your AI agent to look at [chunked_engine.py](engines/chunked_engine.py) and just let it rip in a loop with duckdb & zstandard.
 
-A high-performance, standalone toolset for converting massive Reddit Zstandard (`.zst`) dumps into analytical Parquet files.
+A high-performance, standalone toolset for converting massive Reddit Zstandard (`.zst`) dumps into analytical Parquet files with multiple conversion machines.
+
+I used the [arctic shift](https://github.com/ArthurHeitmann/arctic_shift) project as a source for reddit archive zst downloads and schemas, go take a look!
 
 ## Features
 
