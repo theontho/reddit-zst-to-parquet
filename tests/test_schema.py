@@ -1,8 +1,9 @@
+import pyarrow as pa
+
 from core import schema_parser
 
 
 def test_json_type_to_arrow_basic():
-    import pyarrow as pa
 
     assert schema_parser.json_type_to_arrow("string") == pa.string()
     assert schema_parser.json_type_to_arrow("int") == pa.int64()
@@ -10,7 +11,6 @@ def test_json_type_to_arrow_basic():
 
 
 def test_json_type_to_arrow_array():
-    import pyarrow as pa
 
     res = schema_parser.json_type_to_arrow("array")
     assert res == pa.list_(pa.string())
