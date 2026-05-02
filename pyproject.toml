@@ -3,6 +3,7 @@ name = "reddit-zst-to-parquet"
 version = "0.1.0"
 description = "Robust Reddit ZST to Parquet converter with schema enforcement and optimized sorting."
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
     "pyarrow>=15.0.0",
