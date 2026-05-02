@@ -1,4 +1,3 @@
-
 """Defines the abstract base class for transfer operations."""
 
 from abc import ABC, abstractmethod
@@ -20,9 +19,7 @@ class TransferHandler(ABC):
         pass
 
     @abstractmethod
-    def download_file(
-        self, remote_filename: str, local_path: str, expected_size: int
-    ) -> tuple[bool, float]:
+    def download_file(self, remote_filename: str, local_path: str, expected_size: int) -> tuple[bool, float]:
         """Downloads a single file from the remote host.
 
         Args:

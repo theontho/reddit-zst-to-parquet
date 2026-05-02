@@ -92,9 +92,9 @@ def get_files_to_process(
                     claim_time_str = claim_data.get("started_at")
 
                     # 1. Is it our own claim?
-                    is_own_claim = claim_machine.get("machine") == machine_meta.get(
-                        "machine"
-                    ) and claim_machine.get("ip") == machine_meta.get("ip")
+                    is_own_claim = claim_machine.get("machine") == machine_meta.get("machine") and claim_machine.get(
+                        "ip"
+                    ) == machine_meta.get("ip")
 
                     if is_own_claim:
                         logging.info(f"Found our own previous claim for {filename}. Proceeding.")
@@ -110,18 +110,14 @@ def get_files_to_process(
                                 is_expired = True  # Treat malformed time as expired
 
                         if is_expired:
-                            logging.info(
-                                f"Claim for {filename} is expired (>24h). Deleting and proceeding."
-                            )
+                            logging.info(f"Claim for {filename} is expired (>24h). Deleting and proceeding.")
                             transfer_handler.delete_file(claim_filename)
                         else:
                             # 3. Valid claim by someone else
                             skipped_claimed_by_others.append(filename)
                             continue
                 except json.JSONDecodeError:
-                    logging.warning(
-                        f"Malformed claim file {claim_filename}. Deleting and proceeding."
-                    )
+                    logging.warning(f"Malformed claim file {claim_filename}. Deleting and proceeding.")
                     transfer_handler.delete_file(claim_filename)
 
         # Explicitly skip conversion failures
@@ -155,9 +151,7 @@ def get_files_to_process(
 
     for status_str, files in skipped_parquet_exists.items():
         # Truncate list if it's too long
-        display_files = (
-            files if len(files) <= 10 else [*files[:10], f"...and {len(files) - 10} more"]
-        )
+        display_files = files if len(files) <= 10 else [*files[:10], f"...and {len(files) - 10} more"]
         logging.info(
             f"Skipped {len(files)} files: Corresponding parquet exists remotely and status is '{status_str}'. Files: {', '.join(display_files)}"
         )
@@ -251,12 +245,8 @@ def process_file(
     if not force:
         # Check if a parquet file or a manifest appeared since we last listed
         manifest_filename = f"{parquet_filename}.manifest.json"
-        if transfer_handler.file_exists(parquet_filename) or transfer_handler.file_exists(
-            manifest_filename
-        ):
-            logging.info(
-                f"Concurrency check: {parquet_filename} (or manifest) already exists remotely. Skipping."
-            )
+        if transfer_handler.file_exists(parquet_filename) or transfer_handler.file_exists(manifest_filename):
+            logging.info(f"Concurrency check: {parquet_filename} (or manifest) already exists remotely. Skipping.")
             # Mark as completed in log to avoid checking again
             logger.update_log_entry(log_data, zst_filename, "completed")
             logger.save_log(log_data)
@@ -282,9 +272,7 @@ def process_file(
                     else:
                         logging.debug(f"Resuming our own active claim for {zst_filename}.")
                 except Exception:
-                    logging.warning(
-                        f"Malformed remote claim {claim_filename}. Proceeding with caution."
-                    )
+                    logging.warning(f"Malformed remote claim {claim_filename}. Proceeding with caution.")
     else:
         logging.info(f"Force mode enabled: Bypassing concurrency checks for {zst_filename}")
 
@@ -300,9 +288,7 @@ def process_file(
             json.dump(claim_data, f, indent=2)
         success_claim, _ = transfer_handler.upload_file(local_claim_path, claim_filename)
         if not success_claim:
-            logging.error(
-                f"Failed to upload claim for {zst_filename}. Aborting processing to avoid collisions."
-            )
+            logging.error(f"Failed to upload claim for {zst_filename}. Aborting processing to avoid collisions.")
             return "failed"
     except Exception as e:
         logging.error(f"Error creating/uploading claim for {zst_filename}: {e}")
@@ -321,9 +307,7 @@ def process_file(
                 logging.info(f"Verified complete local ZST: {zst_filename}. Skipping download.")
                 continue
             else:
-                logging.warning(
-                    f"Local ZST size mismatch ({os.path.getsize(f_path)} != {remote_size}). Deleting."
-                )
+                logging.warning(f"Local ZST size mismatch ({os.path.getsize(f_path)} != {remote_size}). Deleting.")
 
         # Delete any other files (partial parquets, logs, old claims, etc)
         with contextlib.suppress(Exception):
@@ -343,19 +327,13 @@ def process_file(
             _update_status("downloading")
             logger.update_log_entry(log_data, zst_filename, "downloading")
             logger.save_log(log_data)
-            update_remote_claim(
-                transfer_handler, file_temp_dir, claim_filename, claim_data, "downloading"
-            )
+            update_remote_claim(transfer_handler, file_temp_dir, claim_filename, claim_data, "downloading")
 
             start_t = time.time()
-            download_ok, duration = transfer_handler.download_file(
-                zst_filename, local_zst_path, remote_size
-            )
+            download_ok, duration = transfer_handler.download_file(zst_filename, local_zst_path, remote_size)
             perf_metrics["stages"]["download"] = {
                 "duration_sec": round(duration, 2),
-                "speed_mb_s": round((remote_size / (1024 * 1024)) / duration, 2)
-                if duration > 0
-                else 0,
+                "speed_mb_s": round((remote_size / (1024 * 1024)) / duration, 2) if duration > 0 else 0,
             }
 
             if not download_ok:
@@ -400,25 +378,19 @@ def process_file(
                     error_msg = f"Could not remove existing local parquet file {local_parquet_path}: {e_rem}. Conversion may fail."
                     logging.error(error_msg)
                     # Update log but proceed with conversion attempt
-                    logger.update_log_entry(
-                        log_data, zst_filename, "converting", error=error_msg
-                    )  # Keep as converting
+                    logger.update_log_entry(log_data, zst_filename, "converting", error=error_msg)  # Keep as converting
                     logger.save_log(log_data)
                     # Don't return False here, let conversion attempt handle it
 
             logger.update_log_entry(log_data, zst_filename, "converting")
             logger.save_log(log_data)
-            update_remote_claim(
-                transfer_handler, file_temp_dir, claim_filename, claim_data, "converting"
-            )
+            update_remote_claim(transfer_handler, file_temp_dir, claim_filename, claim_data, "converting")
 
             start_t = time.time()
 
             def _stage_callback(stage: str):
                 _update_status(stage)
-                update_remote_claim(
-                    transfer_handler, file_temp_dir, claim_filename, claim_data, stage
-                )
+                update_remote_claim(transfer_handler, file_temp_dir, claim_filename, claim_data, stage)
                 if "fallback" in stage:
                     perf_metrics["fallback_occurred"] = True
                     perf_metrics["fallback_stage"] = stage
@@ -435,13 +407,9 @@ def process_file(
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 error_msg = f"Conversion script execution failed: {e}"
                 logging.error(error_msg)  # Detailed logs within converter.py
-                logger.update_log_entry(
-                    log_data, zst_filename, "conversion_failed", error=str(e)[:500]
-                )
+                logger.update_log_entry(log_data, zst_filename, "conversion_failed", error=str(e)[:500])
                 logger.save_log(log_data)
-                update_terminal_title(
-                    f"{progress_prefix}FAILED: {zst_filename} (Conversion Script Error)"
-                )
+                update_terminal_title(f"{progress_prefix}FAILED: {zst_filename} (Conversion Script Error)")
                 # Do not clean up temp dir on conversion failure
                 return "failed"  # Explicitly return "failed", requires manual check
 
@@ -450,15 +418,13 @@ def process_file(
 
             if not convert_ok:
                 # Error should have been logged by converter.py if file not found
-                error_msg = f"Conversion failed: Parquet file {local_parquet_path} not created or other error (see logs)."
+                error_msg = (
+                    f"Conversion failed: Parquet file {local_parquet_path} not created or other error (see logs)."
+                )
                 logging.error(error_msg)
-                logger.update_log_entry(
-                    log_data, zst_filename, "conversion_failed", error=error_msg, perf=perf_metrics
-                )
+                logger.update_log_entry(log_data, zst_filename, "conversion_failed", error=error_msg, perf=perf_metrics)
                 logger.save_log(log_data)
-                update_terminal_title(
-                    f"{progress_prefix}FAILED: {zst_filename} (Conversion Output Missing)"
-                )
+                update_terminal_title(f"{progress_prefix}FAILED: {zst_filename} (Conversion Output Missing)")
                 # Do not clean up temp dir on conversion failure
                 return "failed"  # Explicitly return "failed", requires manual check
 
@@ -467,16 +433,11 @@ def process_file(
             current_status = "converted"
 
             # Safety Check: Only delete if the parquet file is valid and has content
-            if (
-                os.path.exists(local_parquet_path)
-                and os.path.getsize(local_parquet_path) > 10 * 1024
-            ):
+            if os.path.exists(local_parquet_path) and os.path.getsize(local_parquet_path) > 10 * 1024:
                 if os.path.exists(local_zst_path):
                     try:
                         os.remove(local_zst_path)
-                        logging.info(
-                            f"Deleted source ZST after verified conversion: {local_zst_path}"
-                        )
+                        logging.info(f"Deleted source ZST after verified conversion: {local_zst_path}")
                     except OSError as e_rem:
                         logging.warning(f"Could not delete source ZST {local_zst_path}: {e_rem}")
             else:
@@ -492,9 +453,7 @@ def process_file(
                 log_data, zst_filename, "downloaded", error=error_msg
             )  # Go back to downloaded state
             logger.save_log(log_data)
-            update_terminal_title(
-                f"{progress_prefix}RETRYING: {zst_filename} (Missing local Parquet)"
-            )
+            update_terminal_title(f"{progress_prefix}RETRYING: {zst_filename} (Missing local Parquet)")
             return "failed"  # Let main loop retry conversion
         else:
             logging.info(
@@ -506,29 +465,21 @@ def process_file(
             _update_status("uploading")
             logger.update_log_entry(log_data, zst_filename, "uploading")
             logger.save_log(log_data)
-            update_remote_claim(
-                transfer_handler, file_temp_dir, claim_filename, claim_data, "uploading"
-            )
+            update_remote_claim(transfer_handler, file_temp_dir, claim_filename, claim_data, "uploading")
 
             start_t = time.time()
             upload_ok, duration = transfer_handler.upload_file(local_parquet_path, parquet_filename)
 
-            parquet_size = (
-                os.path.getsize(local_parquet_path) if os.path.exists(local_parquet_path) else 0
-            )
+            parquet_size = os.path.getsize(local_parquet_path) if os.path.exists(local_parquet_path) else 0
             perf_metrics["stages"]["upload"] = {
                 "duration_sec": round(duration, 2),
-                "speed_mb_s": round((parquet_size / (1024 * 1024)) / duration, 2)
-                if duration > 0
-                else 0,
+                "speed_mb_s": round((parquet_size / (1024 * 1024)) / duration, 2) if duration > 0 else 0,
             }
 
             if not upload_ok:
                 error_msg = f"Upload failed for {parquet_filename}. See previous logs for details."
                 logging.error(error_msg)
-                logger.update_log_entry(
-                    log_data, zst_filename, "upload_failed", error=error_msg, perf=perf_metrics
-                )
+                logger.update_log_entry(log_data, zst_filename, "upload_failed", error=error_msg, perf=perf_metrics)
                 logger.save_log(log_data)
                 update_terminal_title(f"{progress_prefix}FAILED: {zst_filename} (Upload)")
                 return "failed"  # Failed this step
@@ -546,28 +497,20 @@ def process_file(
 
                     with open(local_manifest_path, "w") as f:
                         json.dump(manifest_data, f, indent=2)
-                    logging.info(
-                        f"Injected conversion history into manifest: {local_manifest_path}"
-                    )
+                    logging.info(f"Injected conversion history into manifest: {local_manifest_path}")
                 except Exception as e:
-                    logging.warning(
-                        f"Could not inject history into manifest {local_manifest_path}: {e}"
-                    )
+                    logging.warning(f"Could not inject history into manifest {local_manifest_path}: {e}")
 
                 manifest_filename = parquet_filename + ".manifest.json"
                 logging.info(f"Uploading manifest: {manifest_filename}")
                 # We don't track manifest upload as a separate stage for simplicity,
                 # but we'll log its failure if it happens
-                m_upload_ok, _ = transfer_handler.upload_file(
-                    local_manifest_path, manifest_filename
-                )
+                m_upload_ok, _ = transfer_handler.upload_file(local_manifest_path, manifest_filename)
                 if m_upload_ok:
                     # Success! Manifest replaces claim.
                     transfer_handler.delete_file(claim_filename)
                 else:
-                    logging.warning(
-                        f"Manifest upload failed for {manifest_filename}, but parquet was successful."
-                    )
+                    logging.warning(f"Manifest upload failed for {manifest_filename}, but parquet was successful.")
             else:
                 # No manifest? Still successful parquet, but delete claim anyway
                 transfer_handler.delete_file(claim_filename)
@@ -589,17 +532,13 @@ def process_file(
         if current_status in ["completed", "conversion_failed", "upload_failed", "download_failed"]:
             cleanup_local_temp(file_temp_dir)
             if current_status != "completed":
-                logging.info(
-                    f"Cleaned up local temp and releasing claim for FAILED file: {zst_filename}"
-                )
+                logging.info(f"Cleaned up local temp and releasing claim for FAILED file: {zst_filename}")
                 transfer_handler.delete_file(claim_filename)
 
         return "success" if current_status == "completed" else "failed"
 
     except KeyboardInterrupt:
-        logging.info(
-            f"Process interrupted by user for {zst_filename}. Cleaning up claim and local temp..."
-        )
+        logging.info(f"Process interrupted by user for {zst_filename}. Cleaning up claim and local temp...")
         try:
             # Delete remote claim
             transfer_handler.delete_file(claim_filename)
@@ -638,9 +577,7 @@ def process_file(
         return "failed"
 
 
-def cleanup_own_claims(
-    remote_other_files: set[str], transfer_handler: TransferHandler, machine_meta: dict
-):
+def cleanup_own_claims(remote_other_files: set[str], transfer_handler: TransferHandler, machine_meta: dict):
     """Deletes all claim files on the remote server that belong to this machine."""
     logging.debug("Checking for abandoned claims from this machine...")
     own_claims_deleted = 0
@@ -651,9 +588,9 @@ def cleanup_own_claims(
                 try:
                     claim_data = json.loads(claim_str)
                     claim_machine = claim_data.get("machine_meta", {})
-                    if claim_machine.get("machine") == machine_meta.get(
-                        "machine"
-                    ) and claim_machine.get("ip") == machine_meta.get("ip"):
+                    if claim_machine.get("machine") == machine_meta.get("machine") and claim_machine.get(
+                        "ip"
+                    ) == machine_meta.get("ip"):
                         logging.info(f"Deleting abandoned claim: {filename}")
                         if transfer_handler.delete_file(filename):
                             own_claims_deleted += 1

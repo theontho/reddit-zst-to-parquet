@@ -101,7 +101,6 @@ DUCKDB_JSON_READ_OPTIONS: str = f"""
 DUCKDB_ZSTD_CODEC: str = DUCKDB_PARQUET_COMPRESSION_CODEC  # Use configured codec for merged output
 
 
-
 # --- Logging Setup ---
 def setup_logging(log_dir: str | None, log_filename_base: str, verbose: bool) -> None:
     """Configures logging to file and console."""
@@ -253,9 +252,7 @@ def run_command(command, shell=False):
     return process
 
 
-def run_duckdb_command(
-    command_list: list[str], description: str, verbose: bool = False
-) -> tuple[str | None, bool]:
+def run_duckdb_command(command_list: list[str], description: str, verbose: bool = False) -> tuple[str | None, bool]:
     """Helper function to run a DuckDB command via subprocess and handle errors."""
     logging.debug(f"Executing DuckDB command ({description})...")
     if verbose:
@@ -291,9 +288,7 @@ def run_duckdb_command(
             logging.debug(f"DuckDB ({description}) stdout:\n{stdout}")
 
         if has_error:
-            if process.returncode != 0 and not (
-                "error:" in stderr.lower() or "parser error:" in stderr.lower()
-            ):
+            if process.returncode != 0 and not ("error:" in stderr.lower() or "parser error:" in stderr.lower()):
                 logging.error(
                     f"Error: DuckDB command ({description}) failed with exit code {process.returncode} (stderr did not contain standard error patterns). Check logs."
                 )
@@ -336,9 +331,7 @@ def parse_duckdb_count(output: str | None) -> int | None:
             return None
     else:
         # Log as error if pattern not found
-        logging.error(
-            f"Error: Could not find count pattern in DuckDB output.\nOutput was:\n{output}"
-        )
+        logging.error(f"Error: Could not find count pattern in DuckDB output.\nOutput was:\n{output}")
         return None
 
 
@@ -363,9 +356,7 @@ def merge_and_verify_parquet(
 
     stats_generated_ok = _generate_chunk_stats(input_files, stats_json_path, verbose)
     if not stats_generated_ok:
-        logging.warning(
-            "Warning: Failed to generate chunk stats JSON file. Continuing with merge..."
-        )
+        logging.warning("Warning: Failed to generate chunk stats JSON file. Continuing with merge...")
         # Decide if merge should proceed if stats fail? For now, yes.
 
     # --- Merge Step (Standardized Logic) ---
@@ -374,9 +365,7 @@ def merge_and_verify_parquet(
 
     master_columns = load_master_schema(output_path)
 
-    logging.debug(
-        f"--- Running Standardized Merge (Master Schema: {'Yes' if master_columns else 'No'}) ---"
-    )
+    logging.debug(f"--- Running Standardized Merge (Master Schema: {'Yes' if master_columns else 'No'}) ---")
     try:
         with duckdb.connect(":memory:") as con:
             # --- Ultra-Stable Merge Configuration ---
@@ -391,15 +380,13 @@ def merge_and_verify_parquet(
                     "Enabling Ultra-Stable mode: threads=1, memory_limit=16GB."
                 )
                 merge_threads = 1
-                merge_memory = min(merge_memory, 16) # Cap at 16GB for stability
+                merge_memory = min(merge_memory, 16)  # Cap at 16GB for stability
 
             con.execute(f"SET threads={merge_threads};")
             con.execute(f"SET memory_limit='{merge_memory}GB';")
             # Increase max temp size to avoid conservative defaults on some systems
             con.execute("SET max_temp_directory_size='1TB';")
-            con.execute(
-                f"SET preserve_insertion_order={'true' if DUCKDB_PRESERVE_INSERTION_ORDER else 'false'};"
-            )
+            con.execute(f"SET preserve_insertion_order={'true' if DUCKDB_PRESERVE_INSERTION_ORDER else 'false'};")
 
             from core.utils import Heartbeat
 
@@ -445,8 +432,6 @@ def merge_and_verify_parquet(
             with Heartbeat("merging chunks"):
                 con.execute(sql_merge_command)
 
-
-
     except Exception as e:
         logging.error(f"Merge process failed: {e}")
         if os.path.exists(output_path):
@@ -457,9 +442,7 @@ def merge_and_verify_parquet(
     logging.info(f"Successfully created merged Parquet file: {output_path}")
 
     # --- Verification Steps (Existing Logic) ---
-    merge_verified = _verify_merge_counts(
-        parquet_files_list_str, quoted_output_file, duckdb_path, output_path, verbose
-    )
+    merge_verified = _verify_merge_counts(parquet_files_list_str, quoted_output_file, duckdb_path, output_path, verbose)
 
     if merge_verified:
         # --- Generate Final Manifest ---
@@ -470,9 +453,7 @@ def merge_and_verify_parquet(
     return merge_verified
 
 
-def _generate_parquet_manifest(
-    parquet_path: str, duckdb_path: str, output_manifest_path: str
-) -> bool:
+def _generate_parquet_manifest(parquet_path: str, duckdb_path: str, output_manifest_path: str) -> bool:
     """Generates a detailed manifest JSON for a single Parquet file including schema and null frequency."""
     logging.info(f"--- Generating Final Manifest: {os.path.basename(output_manifest_path)} ---")
     try:
@@ -481,9 +462,7 @@ def _generate_parquet_manifest(
         # Connect to get schema first
         with duckdb.connect(":memory:") as con:
             con.execute(f"SET threads={DUCKDB_THREADS};")  # Use config threads for manifest scan
-            schema_info = con.execute(
-                f"DESCRIBE SELECT * FROM read_parquet({parquet_path_sql})"
-            ).fetchall()
+            schema_info = con.execute(f"DESCRIBE SELECT * FROM read_parquet({parquet_path_sql})").fetchall()
             columns = [r[0] for r in schema_info]
             types = {r[0]: r[1] for r in schema_info}
 
@@ -503,15 +482,12 @@ def _generate_parquet_manifest(
             manifest = {
                 "filename": os.path.basename(parquet_path),
                 "file_size": os.path.getsize(parquet_path),
-                "last_modified": time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(parquet_path))
-                ),
+                "last_modified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(parquet_path))),
                 "row_count": total_rows,
                 "conversion_method": "chunked",
                 "schema": types,
                 "column_stats": {},
             }
-
 
             for i, col in enumerate(columns):
                 col_count = stats_result[i + 1]
@@ -540,9 +516,7 @@ def _verify_merge_counts(
     logging.info("--- Verifying Row Counts ---")
 
     # 2. Count rows in input files (using the list)
-    sql_count_input = (
-        f"SELECT COUNT(*) FROM read_parquet([{parquet_files_list_str}], union_by_name=True);"
-    )
+    sql_count_input = f"SELECT COUNT(*) FROM read_parquet([{parquet_files_list_str}], union_by_name=True);"
     duckdb_count_input_command = [duckdb_path, "-c", sql_count_input]
     input_count_output, input_count_success = run_duckdb_command(
         duckdb_count_input_command, "count input chunks", verbose=verbose
@@ -596,9 +570,7 @@ def _verify_merge_counts(
         return False  # Indicate failure
 
 
-def summarize_schema_differences(
-    chunk_schemas: dict[int, dict[str, str]], verbose: bool = False
-) -> None:
+def summarize_schema_differences(chunk_schemas: dict[int, dict[str, str]], verbose: bool = False) -> None:
     """Analyzes collected schemas and prints a summary of differences."""
     logging.info("\n--- Schema Analysis Summary ---")
     if not chunk_schemas:
@@ -628,9 +600,7 @@ def summarize_schema_differences(
     logging.info(f"Processed {processed_chunks} chunks.")
     logging.info(f"  Successfully introspected schema for: {successful_chunks} chunks.")
     if error_chunks > 0:
-        logging.info(
-            f"  Failed to get schema (or no simple columns found) for: {error_chunks} chunks."
-        )
+        logging.info(f"  Failed to get schema (or no simple columns found) for: {error_chunks} chunks.")
         if verbose:
             logging.info("  Error details:")
             for msg, count in error_messages.items():
@@ -640,9 +610,7 @@ def summarize_schema_differences(
         logging.info("No columns found in successfully processed schemas.")
         return
 
-    logging.info(
-        f"Found {len(all_columns)} unique simple columns across {successful_chunks} successful chunks."
-    )
+    logging.info(f"Found {len(all_columns)} unique simple columns across {successful_chunks} successful chunks.")
 
     if verbose:
         logging.info("\n--- Detailed Column Analysis --- (Present in X / Y successful chunks)")
@@ -654,9 +622,7 @@ def summarize_schema_differences(
             # Format types: "TYPE1 (N1), TYPE2 (N2)"
             type_str = ", ".join([f"{t} ({c})" for t, c in sorted(types_observed.items())])
             # Use consistent quoting style
-            logging.info(
-                f"- '{col_name}': Present in {presence_count}/{successful_chunks} chunks. Types: [{type_str}]"
-            )
+            logging.info(f"- '{col_name}': Present in {presence_count}/{successful_chunks} chunks. Types: [{type_str}]")
 
     logging.info("-----------------------------")
 
@@ -692,20 +658,14 @@ def _generate_chunk_stats(input_files: list[str], stats_json_path: str, verbose:
                     chunk_key = int(match.group(1))  # Use chunk number if parseable
 
                 if verbose:
-                    logging.debug(
-                        f"  Analyzing schema for: {os.path.basename(file_path)} (Key: {chunk_key})"
-                    )
+                    logging.debug(f"  Analyzing schema for: {os.path.basename(file_path)} (Key: {chunk_key})")
 
                 try:
                     file_path_sql = quote_sql_string(file_path)
-                    describe_query = (
-                        f"DESCRIBE SELECT * FROM read_parquet({file_path_sql}) LIMIT 0;"
-                    )
+                    describe_query = f"DESCRIBE SELECT * FROM read_parquet({file_path_sql}) LIMIT 0;"
                     rel = con.execute(describe_query)
                     col_names = [c[0] for c in rel.description]
-                    schema_rows = [
-                        dict(zip(col_names, row, strict=False)) for row in rel.fetchall()
-                    ]
+                    schema_rows = [dict(zip(col_names, row, strict=False)) for row in rel.fetchall()]
 
                     if not schema_rows:
                         if verbose:
@@ -757,9 +717,7 @@ def _generate_chunk_stats(input_files: list[str], stats_json_path: str, verbose:
 
     # Sort column_locations based on the frequency of the column (obtained from column_frequencies)
     # The key for sorting is the frequency associated with the column_locations key
-    sorted_loc_items = sorted(
-        column_locations.items(), key=lambda item: column_frequencies.get(item[0], 0)
-    )
+    sorted_loc_items = sorted(column_locations.items(), key=lambda item: column_frequencies.get(item[0], 0))
     sorted_column_locations = dict(sorted_loc_items)
 
     # --- Generate Chunk Stats JSON ---
@@ -802,9 +760,7 @@ def parse_arguments() -> argparse.Namespace:
         help="Path for the final output Parquet file (.parquet). Required if --merge-only is used. Optional otherwise (defaults to input filename with .parquet extension). Ignored if --analyze-schemas is used.",
     )
     # ...
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Enable verbose logging output."
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging output.")
     parser.add_argument(
         "--chunk_size",
         type=int,
@@ -814,12 +770,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--duckdb_path", default=DUCKDB_PATH, help=f"Path to the duckdb executable (default: '{DUCKDB_PATH}')"
     )
-    parser.add_argument(
-        "--zstd_path", default=ZSTD_PATH, help=f"Path to the zstd executable (default: '{ZSTD_PATH}')"
-    )
-    parser.add_argument(
-        "--temp_dir", default=None, help="Directory for temporary files (default: system temp)"
-    )
+    parser.add_argument("--zstd_path", default=ZSTD_PATH, help=f"Path to the zstd executable (default: '{ZSTD_PATH}')")
+    parser.add_argument("--temp_dir", default=None, help="Directory for temporary files (default: system temp)")
     parser.add_argument(
         "--test-run",
         action="store_true",
@@ -855,17 +807,13 @@ def parse_arguments() -> argparse.Namespace:
 
     # --- Mode-specific Validation ---
     is_zst_conversion_mode = not args.analyze_schemas and not args.merge_only
-    input_file_for_logic = (
-        args.input_path[0] if args.input_path else None
-    )  # Get first input for logic checks
+    input_file_for_logic = args.input_path[0] if args.input_path else None  # Get first input for logic checks
 
     if args.analyze_schemas:
         # Analyze Schemas Mode Validation
         # Input can now be a glob pattern, validation moved to analyze_parquet_schemas
         if args.merge_only or args.no_merge or args.test_run:
-            parser.error(
-                "--analyze-schemas cannot be used with --merge-only, --no-merge, or --test-run."
-            )
+            parser.error("--analyze-schemas cannot be used with --merge-only, --no-merge, or --test-run.")
         # output_path is now effectively ignored for analysis mode, stats file goes to log_dir
         if args.output_path is not None:
             logging.warning(
@@ -918,9 +866,7 @@ def parse_arguments() -> argparse.Namespace:
     if (
         not args.merge_only and not args.analyze_schemas and not shutil.which(args.zstd_path)
     ):  # Only check zstd if not merge/analyze
-        parser.error(
-            f"Cannot find zstd executable at '{args.zstd_path}'. Use --zstd_path or ensure it's in PATH."
-        )
+        parser.error(f"Cannot find zstd executable at '{args.zstd_path}'. Use --zstd_path or ensure it's in PATH.")
 
     # --- Adjust Chunk Size Based on Input Filename (RC vs RS) ---
     # Apply only in ZST conversion mode and NOT during a test run
@@ -972,9 +918,7 @@ def handle_merge_only_mode(args: argparse.Namespace) -> None:
         expanded_item = os.path.expanduser(expanded_item)
         found_files = glob.glob(expanded_item)
         if not found_files and not os.path.exists(expanded_item):
-            logging.warning(
-                f"Warning: Input '{item}' did not match any files and is not an existing file."
-            )
+            logging.warning(f"Warning: Input '{item}' did not match any files and is not an existing file.")
         parquet_files_to_merge.extend(found_files)
 
     # Filter for only .parquet files
@@ -984,9 +928,7 @@ def handle_merge_only_mode(args: argparse.Namespace) -> None:
     parquet_files_to_merge = sorted(set(parquet_files_to_merge))
 
     if not parquet_files_to_merge:
-        logging.error(
-            f"Error: No Parquet files found matching any input: {input_paths_or_patterns}"
-        )
+        logging.error(f"Error: No Parquet files found matching any input: {input_paths_or_patterns}")
         sys.exit(1)
 
     logging.info(f"Found {len(parquet_files_to_merge)} Parquet files to merge.")
@@ -1034,9 +976,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
             standard_columns = load_standard_columns(schema_path)
             logging.info(f"Loaded {len(standard_columns)} standard columns from monthly schema.")
         else:
-            logging.warning(
-                "No master or monthly schema found. Falling back to dynamic simple columns."
-            )
+            logging.warning("No master or monthly schema found. Falling back to dynamic simple columns.")
 
     # Determine and create the temporary directory
     temp_dir_path = _setup_temp_directory(args.temp_dir, output_parquet_path)
@@ -1044,9 +984,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         sys.exit(1)  # Error creating temp dir
 
     # --- Initialize Resume State ---
-    start_chunk_num, lines_to_skip, initial_parquet_files = _initialize_resume_state(
-        temp_dir_path, args.chunk_size
-    )
+    start_chunk_num, lines_to_skip, initial_parquet_files = _initialize_resume_state(temp_dir_path, args.chunk_size)
     # Initialize based on resume state
     parquet_chunk_files: list[str] = initial_parquet_files
     chunk_schemas: dict[int, dict[str, str]] = {}
@@ -1067,9 +1005,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 zstd_cmd, stdout=subprocess.PIPE, text=True, errors="replace", encoding="utf-8"
             )
         except FileNotFoundError:
-            logging.error(
-                f"Error: Failed to start zstd process. Command not found at '{args.zstd_path}'."
-            )
+            logging.error(f"Error: Failed to start zstd process. Command not found at '{args.zstd_path}'.")
             sys.exit(1)
         except Exception as e:
             logging.error(f"Error starting zstd process: {e}")
@@ -1123,9 +1059,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 logging.error(f"\nError reading from zstd stream during chunk {chunk_num}: {e}")
                 # Check zstd process status
                 if zstd_proc.poll() is not None:
-                    logging.error(
-                        f"zstd process exited unexpectedly with code {zstd_proc.returncode}."
-                    )
+                    logging.error(f"zstd process exited unexpectedly with code {zstd_proc.returncode}.")
                 break  # Exit the loop on read error
 
             if not chunk_lines:  # No more lines read, previous chunk was the last
@@ -1161,12 +1095,8 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 # parquet_chunk_files list is updated inside _process_chunk now
 
             # Check if the zstd process has exited unexpectedly AFTER reading
-            if (
-                zstd_proc.poll() is not None and not chunk_lines
-            ):  # Check poll only if readline returned empty last time
-                logging.error(
-                    f"zstd process exited with code {zstd_proc.returncode} while reading data."
-                )
+            if zstd_proc.poll() is not None and not chunk_lines:  # Check poll only if readline returned empty last time
+                logging.error(f"zstd process exited with code {zstd_proc.returncode} while reading data.")
                 break
 
             # Check for test run condition
@@ -1188,7 +1118,6 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 except subprocess.TimeoutExpired:
                     logging.warning(
                         f"Warning: zstd did not terminate gracefully after {ZSTD_TERMINATION_TIMEOUT_SECONDS}s, killing..."
-
                     )
                     zstd_proc.kill()
                     zstd_returncode = zstd_proc.wait()  # Get final code after kill
@@ -1204,9 +1133,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         # --- Merge Step ---
         if not parquet_chunk_files:
             logging.error("\nError: No Parquet chunk files were successfully created.")
-            logging.error(
-                "Input file might be empty, contain only invalid JSON, or all chunks failed processing."
-            )
+            logging.error("Input file might be empty, contain only invalid JSON, or all chunks failed processing.")
             sys.exit(1)  # Exit if no chunks produced
 
         if not args.no_merge:
@@ -1291,9 +1218,7 @@ def _initialize_resume_state(temp_dir_path: str, chunk_size: int) -> tuple[int, 
     if chunk_numbers_found == expected_chunks:
         start_chunk_num = max_chunk_num + 1
         lines_to_skip = max_chunk_num * chunk_size
-        logging.info(
-            f"Found contiguous chunks up to {max_chunk_num}. Resuming from chunk {start_chunk_num}."
-        )
+        logging.info(f"Found contiguous chunks up to {max_chunk_num}. Resuming from chunk {start_chunk_num}.")
         logging.info(f"Will skip approximately {lines_to_skip:,} lines from the input.")
         return start_chunk_num, lines_to_skip, existing_parquet_files
     else:
@@ -1304,16 +1229,12 @@ def _initialize_resume_state(temp_dir_path: str, chunk_size: int) -> tuple[int, 
             logging.warning(f"  Missing chunk numbers: {sorted(missing)}")
         if extra:
             logging.warning(f"  Unexpected chunk numbers: {sorted(extra)}")
-        logging.warning(
-            "Inconsistent state detected. Cleaning temporary directory and starting fresh for safety."
-        )
+        logging.warning("Inconsistent state detected. Cleaning temporary directory and starting fresh for safety.")
         try:
             for f in glob.glob(os.path.join(temp_dir_path, "chunk_*")):
                 os.remove(f)
         except Exception:
-            logging.error(
-                "Error cleaning temporary directory. Please clean manually or use --temp_dir."
-            )
+            logging.error("Error cleaning temporary directory. Please clean manually or use --temp_dir.")
             # Decide whether to exit or proceed? Proceeding might be okay.
         return 1, 0, []
 
@@ -1375,9 +1296,7 @@ def _process_chunk(
     """
     if standard_columns is None:
         standard_columns = []
-    progress_str = (
-        f"Processing chunk {chunk_num:>4} (lines {chunk_start_line:,}-{chunk_end_line:,})"
-    )
+    progress_str = f"Processing chunk {chunk_num:>4} (lines {chunk_start_line:,}-{chunk_end_line:,})"
     temp_jsonl_filename = os.path.join(temp_dir_path, f"chunk_{chunk_num:05d}.jsonl")
     temp_parquet_filename = os.path.join(temp_dir_path, f"chunk_{chunk_num:05d}.parquet")
     chunk_byte_size = 0
@@ -1392,9 +1311,7 @@ def _process_chunk(
             chunk_byte_size = os.path.getsize(temp_jsonl_filename)
             cumulative_bytes_processed = current_cumulative_bytes + chunk_byte_size
             if estimated_total_size is not None and estimated_total_size > 0:
-                percentage = min(
-                    100.0, (cumulative_bytes_processed / estimated_total_size) * 100
-                )  # Cap at 100%
+                percentage = min(100.0, (cumulative_bytes_processed / estimated_total_size) * 100)  # Cap at 100%
                 progress_str += f" | Size: {format_size(chunk_byte_size):>8} | Total: ~{format_size(cumulative_bytes_processed):>8} / {format_size(estimated_total_size)} ({percentage: >5.1f}%)"
             else:
                 progress_str += f" | Size: {format_size(chunk_byte_size):>8} | Total: {format_size(cumulative_bytes_processed)} (total size unknown)"
@@ -1427,9 +1344,7 @@ def _process_chunk(
                 # Using a larger maximum_object_size can help with complex nested JSONs during schema detection
                 if args.verbose:
                     # Ensure newline if printing verbose schema info after progress bar
-                    logging.debug(
-                        f"\nRunning DESCRIBE query for {os.path.basename(temp_jsonl_filename)}"
-                    )
+                    logging.debug(f"\nRunning DESCRIBE query for {os.path.basename(temp_jsonl_filename)}")
 
                 # Fetch results as a list of dictionaries to avoid Pandas dependency
                 rel = con.execute(describe_query)
@@ -1480,9 +1395,7 @@ def _process_chunk(
                         final_selects.append("CAST(NULL AS VARCHAR) AS extra_json")
 
                     select_clause = ", ".join(final_selects)
-                    current_schema = {
-                        col: "DYNAMIC" for col in standard_columns if col in chunk_cols_set
-                    }
+                    current_schema = {col: "DYNAMIC" for col in standard_columns if col in chunk_cols_set}
                 else:
                     # Original dynamic simple columns logic
                     simple_columns = []
@@ -1495,9 +1408,7 @@ def _process_chunk(
                             current_schema[col_name] = col_type
 
                     if not simple_columns:
-                        logging.warning(
-                            f"\nWarning: No simple columns found for chunk {chunk_num}. Skipping."
-                        )
+                        logging.warning(f"\nWarning: No simple columns found for chunk {chunk_num}. Skipping.")
                         return None
                     select_clause = ", ".join(simple_columns)
 
@@ -1527,9 +1438,7 @@ def _process_chunk(
                 f"\nError during schema introspection or query generation for chunk {chunk_num} ({temp_jsonl_filename}): {e}"
             )
             logging.warning("Skipping Parquet conversion for this chunk.")
-            chunk_schemas[chunk_num] = {
-                "__error__": f"Introspection failed: {e}"
-            }  # Record schema error
+            chunk_schemas[chunk_num] = {"__error__": f"Introspection failed: {e}"}  # Record schema error
             schema_success = False  # Mark as failed
             # Optionally close connection if open - Context manager handles this
             # try: con.close()
@@ -1574,30 +1483,22 @@ def _process_chunk(
                 # For now, let's continue to the next chunk
                 # Clean up JSONL if conversion failed
                 if not args.test_run and os.path.exists(temp_jsonl_filename):
-                    logging.warning(
-                        f"\nCleaning up JSONL for failed conversion: {temp_jsonl_filename}"
-                    )
+                    logging.warning(f"\nCleaning up JSONL for failed conversion: {temp_jsonl_filename}")
                     try:
                         os.remove(temp_jsonl_filename)
                     except OSError as e_rem:
-                        logging.warning(
-                            f"Warning: Failed to remove JSONL {temp_jsonl_filename}: {e_rem}"
-                        )
+                        logging.warning(f"Warning: Failed to remove JSONL {temp_jsonl_filename}: {e_rem}")
                 return None  # Indicate failure for this chunk
         else:
             # This case should not be hit due to schema_success check above
-            logging.warning(
-                f"\nSkipped DuckDB command execution for chunk {chunk_num} due to previous errors."
-            )
+            logging.warning(f"\nSkipped DuckDB command execution for chunk {chunk_num} due to previous errors.")
             # Clean up JSONL
             if not args.test_run and os.path.exists(temp_jsonl_filename):
                 logging.warning(f"\nCleaning up JSONL for skipped execution: {temp_jsonl_filename}")
                 try:
                     os.remove(temp_jsonl_filename)
                 except OSError as e_rem:
-                    logging.warning(
-                        f"Warning: Failed to remove JSONL {temp_jsonl_filename}: {e_rem}"
-                    )
+                    logging.warning(f"Warning: Failed to remove JSONL {temp_jsonl_filename}: {e_rem}")
             return None  # Indicate failure for this chunk
 
     except Exception as e:
@@ -1614,9 +1515,7 @@ def _process_chunk(
             try:
                 os.remove(temp_jsonl_filename)
             except OSError as e:
-                logging.warning(
-                    f"\nWarning: Failed to delete temp JSONL {temp_jsonl_filename}: {e}"
-                )
+                logging.warning(f"\nWarning: Failed to delete temp JSONL {temp_jsonl_filename}: {e}")
         else:
             if args.verbose:
                 logging.debug(f"Test run: Keeping temporary JSONL: {temp_jsonl_filename}")
@@ -1653,19 +1552,13 @@ def _inspect_chunk_schemas(parquet_files: list[str], duckdb_path: str) -> None:
     logging.info("----------------------------------------------------")
 
 
-def _cleanup_temp_directory(
-    temp_dir_path: str | None, args: argparse.Namespace, merge_successful: bool
-) -> None:
+def _cleanup_temp_directory(temp_dir_path: str | None, args: argparse.Namespace, merge_successful: bool) -> None:
     """Cleans up the temporary directory based on script arguments and success."""
     if temp_dir_path and os.path.exists(temp_dir_path):
         if args.no_merge:
-            logging.info(
-                f"\n--no-merge specified: Keeping temporary directory with Parquet chunks: {temp_dir_path}"
-            )
+            logging.info(f"\n--no-merge specified: Keeping temporary directory with Parquet chunks: {temp_dir_path}")
         elif args.test_run:
-            logging.info(
-                f"\nTest run: Keeping temporary directory with Parquet/JSONL chunks: {temp_dir_path}"
-            )
+            logging.info(f"\nTest run: Keeping temporary directory with Parquet/JSONL chunks: {temp_dir_path}")
         elif merge_successful:  # Standard mode success
             logging.info(f"\nCleaning up temporary directory: {temp_dir_path}")
             try:
@@ -1688,15 +1581,11 @@ def _cleanup_temp_directory(
                 except OSError as e:
                     logging.error(f"Error cleaning up temporary directory {temp_dir_path}: {e}")
     elif temp_dir_path:
-        logging.warning(
-            f"\nTemporary directory {temp_dir_path} does not exist (creation failed?), skipping cleanup."
-        )
+        logging.warning(f"\nTemporary directory {temp_dir_path} does not exist (creation failed?), skipping cleanup.")
     # else: temp_dir_path was None or not created
 
 
-def analyze_parquet_schemas(
-    input_paths_or_patterns: list[str], verbose: bool, log_dir: str
-) -> None:
+def analyze_parquet_schemas(input_paths_or_patterns: list[str], verbose: bool, log_dir: str) -> None:
     """Analyzes schemas of all Parquet files matching pattern(s), prints summary, and writes detailed stats to JSON in the log directory."""
     logging.info(f"--- Analyzing Parquet Schemas Matching: {input_paths_or_patterns} ---")
 
@@ -1706,9 +1595,7 @@ def analyze_parquet_schemas(
         logging.info(f"Searching for Parquet files matching pattern: {item}")
         found_files = glob.glob(item)
         if not found_files and item not in parquet_files:
-            logging.warning(
-                f"Warning: Input '{item}' did not match any files and is not an existing file."
-            )
+            logging.warning(f"Warning: Input '{item}' did not match any files and is not an existing file.")
         parquet_files.extend(found_files)
 
     # --- Debugging: Print files found by glob --- #
@@ -1718,9 +1605,7 @@ def analyze_parquet_schemas(
     parquet_files = sorted(set(parquet_files))
 
     if not parquet_files:
-        logging.error(
-            f"Error: No Parquet files found matching any input: {input_paths_or_patterns}"
-        )
+        logging.error(f"Error: No Parquet files found matching any input: {input_paths_or_patterns}")
         sys.exit(1)
 
     logging.info(f"Found {len(parquet_files)} Parquet files to analyze.")

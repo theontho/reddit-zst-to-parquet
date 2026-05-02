@@ -132,9 +132,7 @@ def normalize_row(row, schema_fields, arrow_schema):
             normalized[field] = None
 
     dumped_extra = json.dumps(extra) if extra else None
-    normalized["extra_json"] = (
-        dumped_extra.decode() if isinstance(dumped_extra, bytes) else dumped_extra
-    )
+    normalized["extra_json"] = dumped_extra.decode() if isinstance(dumped_extra, bytes) else dumped_extra
     return normalized
 
 
@@ -223,9 +221,7 @@ def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> 
         parquet_path_sql = f"'{parquet_path}'"
 
         with duckdb.connect(":memory:") as con:
-            schema_info = con.execute(
-                f"DESCRIBE SELECT * FROM read_parquet({parquet_path_sql})"
-            ).fetchall()
+            schema_info = con.execute(f"DESCRIBE SELECT * FROM read_parquet({parquet_path_sql})").fetchall()
             columns = [r[0] for r in schema_info]
             types = {r[0]: r[1] for r in schema_info}
 
@@ -243,9 +239,7 @@ def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> 
             manifest = {
                 "filename": os.path.basename(parquet_path),
                 "file_size": os.path.getsize(parquet_path),
-                "last_modified": time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(parquet_path))
-                ),
+                "last_modified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(parquet_path))),
                 "row_count": total_rows,
                 "conversion_method": "pyarrow",
                 "schema": types,
@@ -258,17 +252,15 @@ def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> 
                 manifest["column_stats"][col] = {"count": col_count, "usage_ratio": usage_ratio}
 
             import json as std_json
+
             with open(output_manifest_path, "w") as f:
                 std_json.dump(manifest, f, indent=2)
-
-
 
             return True
 
     except Exception as e:
         print(f"Error generating manifest: {e}")
         return False
-
 
 
 import argparse

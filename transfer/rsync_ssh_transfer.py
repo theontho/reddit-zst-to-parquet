@@ -1,4 +1,3 @@
-
 """Implements the TransferHandler using rsync for transfers and ssh for listing."""
 
 import logging
@@ -77,9 +76,7 @@ class RsyncSshTransferHandler(TransferHandler):
                 elif capture_output and not stderr_str.strip():
                     log_func("rsync produced no stderr output.")
             elif capture_output and stderr_str.strip():
-                logging.warning(
-                    f"rsync command succeeded but has stderr output: {stderr_str.strip()}"
-                )
+                logging.warning(f"rsync command succeeded but has stderr output: {stderr_str.strip()}")
 
             if capture_output:
                 logging.debug(f"rsync stdout: {stdout_str.strip()}")
@@ -87,9 +84,7 @@ class RsyncSshTransferHandler(TransferHandler):
             return success, timed_out, stdout_str, stderr_str
 
         except FileNotFoundError:
-            logging.error(
-                "Error: 'rsync' command not found. Please ensure it's installed and in your PATH."
-            )
+            logging.error("Error: 'rsync' command not found. Please ensure it's installed and in your PATH.")
             return False, False, "", "rsync command not found"
         except Exception as e:
             logging.exception(f"Error running rsync command: {e}")
@@ -126,9 +121,7 @@ class RsyncSshTransferHandler(TransferHandler):
             last_stderr = stderr.strip()  # Store last stderr
 
             if op_success:
-                logging.info(
-                    f"rsync {operation} successful for {filename_for_log} on attempt {attempt + 1}."
-                )
+                logging.info(f"rsync {operation} successful for {filename_for_log} on attempt {attempt + 1}.")
                 success = True
                 break
             elif timed_out:
@@ -149,15 +142,11 @@ class RsyncSshTransferHandler(TransferHandler):
 
         if success and operation == "download":
             if not local_dest_path_for_verify:
-                logging.error(
-                    "Internal error: local_dest_path_for_verify not provided for download verification."
-                )
+                logging.error("Internal error: local_dest_path_for_verify not provided for download verification.")
                 return False, elapsed_time
 
             if not os.path.exists(local_dest_path_for_verify):
-                logging.error(
-                    f"Downloaded file {local_dest_path_for_verify} not found after rsync reported success."
-                )
+                logging.error(f"Downloaded file {local_dest_path_for_verify} not found after rsync reported success.")
                 return False, elapsed_time
 
             if expected_size > 0:
@@ -169,18 +158,12 @@ class RsyncSshTransferHandler(TransferHandler):
                         try:
                             os.remove(local_dest_path_for_verify)
                         except OSError as e_rem:
-                            logging.warning(
-                                f"Could not remove mismatched file {local_dest_path_for_verify}: {e_rem}"
-                            )
+                            logging.warning(f"Could not remove mismatched file {local_dest_path_for_verify}: {e_rem}")
                         return False, elapsed_time
                     else:
-                        logging.debug(
-                            f"Downloaded size verified for {filename_for_log} ({local_size} bytes)."
-                        )
+                        logging.debug(f"Downloaded size verified for {filename_for_log} ({local_size} bytes).")
                 except OSError as e_size:
-                    logging.error(
-                        f"Could not get size of downloaded file {local_dest_path_for_verify}: {e_size}."
-                    )
+                    logging.error(f"Could not get size of downloaded file {local_dest_path_for_verify}: {e_size}.")
                     return False, elapsed_time
             else:
                 logging.warning(
@@ -189,9 +172,7 @@ class RsyncSshTransferHandler(TransferHandler):
 
             if elapsed_time > 0:
                 local_size_final = (
-                    os.path.getsize(local_dest_path_for_verify)
-                    if os.path.exists(local_dest_path_for_verify)
-                    else 0
+                    os.path.getsize(local_dest_path_for_verify) if os.path.exists(local_dest_path_for_verify) else 0
                 )
                 if local_size_final > 0:
                     speed = format_speed(local_size_final, elapsed_time)
@@ -215,13 +196,9 @@ class RsyncSshTransferHandler(TransferHandler):
                     local_size = os.path.getsize(source)
                     speed = format_speed(local_size, elapsed_time)
                     size_str = format_size(local_size)
-                    print(
-                        f"Upload completed: {size_str} in {elapsed_time:.1f}s ({speed})", flush=True
-                    )
+                    print(f"Upload completed: {size_str} in {elapsed_time:.1f}s ({speed})", flush=True)
                 except OSError:
-                    print(
-                        f"Upload completed in {elapsed_time:.1f}s (local size unknown)", flush=True
-                    )
+                    print(f"Upload completed in {elapsed_time:.1f}s (local size unknown)", flush=True)
             else:
                 print("Upload completed (time zero)", flush=True)
 
@@ -356,9 +333,7 @@ class RsyncSshTransferHandler(TransferHandler):
         except Exception:
             return False
 
-    def download_file(
-        self, remote_filename: str, local_path: str, expected_size: int
-    ) -> tuple[bool, float]:
+    def download_file(self, remote_filename: str, local_path: str, expected_size: int) -> tuple[bool, float]:
         remote_full_path = f"{REMOTE_DIR}/{remote_filename}"
         source = f"{REMOTE_USER}@{REMOTE_HOST}:{remote_full_path}"
         return self._run_rsync_with_retry(
@@ -385,16 +360,12 @@ class RsyncSshTransferHandler(TransferHandler):
         rsync_ok = False
         ssh_ok = False
         try:
-            rsync_check = subprocess.run(
-                ["rsync", "--version"], capture_output=True, text=True, check=False
-            )
+            rsync_check = subprocess.run(["rsync", "--version"], capture_output=True, text=True, check=False)
             if rsync_check.returncode == 0:
                 logging.info("rsync found.")
                 rsync_ok = True
             else:
-                logging.error(
-                    "Prerequisite check failed: The 'rsync' command was not found or returned an error."
-                )
+                logging.error("Prerequisite check failed: The 'rsync' command was not found or returned an error.")
         except FileNotFoundError:
             logging.error("Prerequisite check failed: 'rsync' command not found in PATH.")
 

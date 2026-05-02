@@ -22,8 +22,7 @@ class NfsTransferHandler(TransferHandler):
         self.nfs_base_path = Path(config.NFS_MOUNT_PATH).expanduser().resolve()
         self.remote_base_dir = self.nfs_base_path / config.REMOTE_DIR
         logger.info(
-            f"NFS Transfer Handler initialized. Base path: {self.nfs_base_path}, "
-            f"Remote dir: {self.remote_base_dir}"
+            f"NFS Transfer Handler initialized. Base path: {self.nfs_base_path}, Remote dir: {self.remote_base_dir}"
         )
 
     def _resolve_remote_path(self, relative_path):
@@ -78,14 +77,10 @@ class NfsTransferHandler(TransferHandler):
                     and mount_point.stat().st_dev != mount_point.parent.stat().st_dev
                 ):
                     is_mounted = True
-                    logger.info(
-                        f"Path '{mount_point}' detected as mount point via device ID check."
-                    )
+                    logger.info(f"Path '{mount_point}' detected as mount point via device ID check.")
 
         except OSError as e:
-            logger.warning(
-                f"Error checking mount status for {mount_point}: {e}. Assuming not mounted."
-            )
+            logger.warning(f"Error checking mount status for {mount_point}: {e}. Assuming not mounted.")
             is_mounted = False
 
         if not is_mounted:
@@ -94,10 +89,7 @@ class NfsTransferHandler(TransferHandler):
             # Construct the suggested command based on config
             # (might need adjustment based on specific NFS server setup)
             nfs_server_path = f"{config.REMOTE_HOST}:/Public/download"
-            suggested_command = (
-                f"sudo mount -t nfs -o resvport,rsize=65536,wsize=65536 "
-                f"{nfs_server_path} {mount_point}"
-            )
+            suggested_command = f"sudo mount -t nfs -o resvport,rsize=65536,wsize=65536 {nfs_server_path} {mount_point}"
             logger.error(f"Suggested command: {suggested_command}")
             return False
 
@@ -154,9 +146,7 @@ class NfsTransferHandler(TransferHandler):
             logger.error(f"Error listing files in {self.remote_base_dir}: {e}")
             raise  # Re-raise the exception to be handled by the main script
 
-    def download_file(
-        self, remote_filename: str, local_path: str, expected_size: int = 0
-    ) -> tuple[bool, float]:
+    def download_file(self, remote_filename: str, local_path: str, expected_size: int = 0) -> tuple[bool, float]:
         """Downloads a file from the NFS mount to the local system."""
         nfs_source_path = self._resolve_remote_path(remote_filename)
         local_dest = Path(local_path)
@@ -174,9 +164,7 @@ class NfsTransferHandler(TransferHandler):
 
             file_size = nfs_source_path.stat().st_size
             size_str = format_size(file_size)
-            logger.info(
-                f"Downloading from NFS '{remote_filename}' ({size_str}) to '{local_path}'..."
-            )
+            logger.info(f"Downloading from NFS '{remote_filename}' ({size_str}) to '{local_path}'...")
 
             start_time = time.monotonic()
             shutil.copy2(nfs_source_path, local_dest)  # copy2 preserves metadata

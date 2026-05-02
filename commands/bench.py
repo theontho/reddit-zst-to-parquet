@@ -81,9 +81,7 @@ def run_benchmark(zst_file: str, temp_dir_base: str, label: str) -> dict[str, An
 
 def run_storage_benchmark():
     """Runs performance benchmarks against different storage targets to identify bottlenecks."""
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - [%(module)s] %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - [%(module)s] %(message)s")
 
     # A large sized file for testing
     test_file = "RC_2011-09.zst"

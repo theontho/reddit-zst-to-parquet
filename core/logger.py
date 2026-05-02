@@ -1,4 +1,3 @@
-
 """Handles loading, saving, and updating the processing log file."""
 
 import json
@@ -25,9 +24,7 @@ def load_log() -> dict:
                     return {"files": {}}
                 # Ensure 'files' key exists and is a dict
                 if not isinstance(log_data.get("files"), dict):
-                    logging.warning(
-                        f"Log file {filepath} 'files' key is not a dictionary. Starting fresh."
-                    )
+                    logging.warning(f"Log file {filepath} 'files' key is not a dictionary. Starting fresh.")
                     log_data["files"] = {}
                 return log_data
         else:
@@ -61,9 +58,7 @@ def save_log(data: dict):
                 pass  # Ignore error during cleanup
 
 
-def update_log_entry(
-    log_data: dict, filename: str, status: str, error: str | None = None, **kwargs
-):
+def update_log_entry(log_data: dict, filename: str, status: str, error: str | None = None, **kwargs):
     """Updates a single file's entry in the log data with support for extra metadata."""
     if "files" not in log_data:
         log_data["files"] = {}
@@ -77,6 +72,4 @@ def update_log_entry(
         entry[key] = value
 
     log_data["files"][filename] = entry
-    logging.debug(
-        f"Log updated for {filename}: status={status}" + (f", error='{error}'" if error else "")
-    )
+    logging.debug(f"Log updated for {filename}: status={status}" + (f", error='{error}'" if error else ""))
