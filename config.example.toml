@@ -1,0 +1,77 @@
+# Arctic Shift: Remote Parquet Conversion Configuration
+# Copy this file to config.local.toml and fill in your details.
+# config.local.toml is ignored by git and is used for machine-specific settings.
+
+[remote]
+host = "192.168.1.28"
+user = "mac"
+directory = "/Public/download"
+
+[ftp]
+host = "192.168.1.28"
+user = "mac"
+password = "YOUR_FTP_PASSWORD_HERE"
+port = 21
+timeout_seconds = 300
+passive_mode = true
+use_ftps = false
+
+[transfer]
+method = "ftp"          # Choose: "rsync", "ftp", "nfs", or "local" (standalone)
+max_retries = 2
+retry_delay_seconds = 5
+timeout_seconds = 300
+
+[paths]
+# The first available/writable path will be used for temporary files
+temp_dir_fallbacks = ["./conversion_temp", "~/Documents/arctic_shift_temp"]
+nfs_mount_path = "~/qnap"
+# Optional overrides for CLI tools (auto-detected by default, e.g., "duckdb.exe" on Windows)
+# duckdb_path = "duckdb"
+# zstd_path = "zstd"
+
+[pipeline]
+max_consecutive_failures = 6
+enable_terminal_title_update = true
+log_file = "conversion_log.json"
+# Number of lines per processing chunk
+chunk_size = 1000000
+# Number of lines for a test run
+test_run_chunk_size = 10000
+# Estimated compression ratio for progress calculations
+compression_ratio_estimate = 16
+# Preferred conversion method: "chunked" (recommended for stability), "streamed" (faster but prone to OOM on large files), or "pyarrow"
+conversion_method = "chunked"
+# Whether to automatically fall back to chunked method if streamed method fails
+fallback_to_chunked = true
+
+
+[duckdb]
+# Number of threads DuckDB will use for processing. 
+# If not specified (or set to 0), it will be auto-detected (CPU cores - 1).
+threads = 0
+
+# Maximum RAM DuckDB is allowed to use (in GB).
+# If not specified (or set to 0), it will be auto-detected (Total RAM * ram_usage_factor).
+memory_limit_gb = 0
+
+# The percentage of total system RAM to use when auto-detecting memory_limit_gb.
+ram_usage_factor = 0.8
+# Whether to preserve insertion order (false improves performance)
+preserve_insertion_order = false
+# Maximum size for a single JSON object in bytes (default 32MB)
+maximum_object_size = 33554432
+# Rows per Parquet row group
+row_group_size = 100000
+# Compression codec for Parquet files (e.g., "ZSTD", "SNAPPY", "UNCOMPRESSED")
+parquet_compression_codec = "ZSTD"
+# File size threshold (GB) to switch to conservative threading
+large_file_threshold_gb = 1.0
+
+
+[zstd]
+# Window size for long-range compression support (bits)
+long_range_bits = 31
+# Seconds to wait for zstd to terminate before killing it
+termination_timeout_seconds = 5
+

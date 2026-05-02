@@ -1,0 +1,10 @@
+.mypy_cache
+.venv
+.ruff_cache
+__pycache__
+.vscode
+
+config.local.toml
+conversion_log.json
+conversion_temp/
+deps/
