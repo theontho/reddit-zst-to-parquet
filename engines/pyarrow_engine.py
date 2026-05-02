@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import contextlib
 import os
 import sys
 
@@ -9,15 +10,12 @@ try:
     import orjson as json
 except ImportError:
     import json as json  # type: ignore
-import contextlib
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.types as types
 
 from core.schema_parser import build_arrow_schema
-
-# Ensure both the current directory and the original scripts directory are in path
 from scripts.fileStreams import getFileJsonStream
 from scripts.utils import FileProgressLog
 
