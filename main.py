@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Arctic Shift: Parquet Converter CLI
+Reddit ZST to Parquet Converter CLI
 Main entry point for the parquet conversion toolset.
 """
 
@@ -16,7 +16,7 @@ from commands.report import run_fleet_report
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Arctic Shift: High-performance Zstandard to Parquet conversion suite."
+        description="Reddit ZST to Parquet: High-performance Zstandard to Parquet conversion suite."
     )
     subparsers = parser.add_subparsers(dest="command", help="Subcommands")
 

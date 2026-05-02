@@ -87,7 +87,7 @@ def run_storage_benchmark():
 
     # A large sized file for testing
     test_file = "RC_2011-09.zst"
-    ssd_path = os.path.expanduser("~/arctic_shift_benchmark_ssd")
+    ssd_path = os.path.expanduser("~/reddit_parquet_benchmark_ssd")
     
     print("\n" + "=" * 70)
     print(f"STORAGE PERFORMANCE BENCHMARK: {test_file}")

@@ -1,6 +1,6 @@
 # Unified Schema Reference ("Clean Union")
 
-This document defines the standard top-level columns used across all Arctic Shift Parquet files. This "Clean Union" strategy ensures that all datasets share a consistent core schema while preserving 100% of the original data via the `extra_json` column.
+This document defines the standard top-level columns used across all generated Parquet files. This "Clean Union" strategy ensures that all datasets share a consistent core schema while preserving 100% of the original data via the `extra_json` column.
 
 ## 1. Core Identity & Search Columns (Shared)
 These columns are guaranteed to be at the top level in both **RC** and **RS** files and are used for primary search and indexing.

@@ -1,6 +1,6 @@
-# Reddit ZST to Parquet (Arctic Shift)
+# Reddit ZST to Parquet
 
-A high-performance, standalone repository for the Arctic Shift Parquet Converter—a distributed suite for converting massive Reddit Zstandard (`.zst`) dumps into analytical Parquet files.
+A high-performance, standalone toolset for converting massive Reddit Zstandard (`.zst`) dumps into analytical Parquet files.
 
 ## Features
 

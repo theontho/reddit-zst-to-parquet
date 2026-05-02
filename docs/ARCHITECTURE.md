@@ -1,6 +1,6 @@
-# Architecture Overview: Arctic Shift Parquet Converter
+# Architecture Overview: Reddit ZST to Parquet Converter
 
-This document describes the design and components of the Arctic Shift Parquet Converter, a system built for high-throughput, distributed conversion of massive Reddit data dumps (.zst) into analytical Parquet files.
+This document describes the design and components of the Reddit ZST to Parquet Converter, a system built for high-throughput, distributed conversion of massive Reddit data dumps (.zst) into analytical Parquet files.
 
 ## High-Level Design
 

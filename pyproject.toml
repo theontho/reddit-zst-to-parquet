@@ -53,7 +53,7 @@ warn_unused_configs = true
 check_untyped_defs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
-exclude = [".venv"]
+exclude = [".venv", "deps"]
 explicit_package_bases = true
 mypy_path = "."
 

@@ -6,7 +6,7 @@ import pyarrow as pa
 
 
 def json_type_to_arrow(json_type: str, nested_schema: Any = None) -> pa.DataType:
-    """Maps arctic_shift JSON schema types to PyArrow types."""
+    """Maps JSON schema types to PyArrow types."""
     mapping = {
         "string": pa.string(),
         "int": pa.int64(),

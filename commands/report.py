@@ -67,7 +67,7 @@ class ManifestDownloader:
 def run_fleet_report():
     """Generates a comprehensive report on the progress and performance of the conversion fleet."""
     print("=" * 60)
-    print("ARCTIC SHIFT: FLEET PROGRESS REPORT")
+    print("REDDIT ZST TO PARQUET: FLEET PROGRESS REPORT")
     print(f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 

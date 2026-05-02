@@ -32,7 +32,7 @@ config_data: dict[str, Any] = {
         "timeout_seconds": 300,
     },
     "paths": {
-        "temp_dir_fallbacks": ["./conversion_temp", "~/Documents/arctic_shift_temp"],
+        "temp_dir_fallbacks": ["./conversion_temp", "~/Documents/reddit_parquet_temp"],
         "nfs_mount_path": "~/qnap",
         "duckdb_path": None,
         "zstd_path": None,

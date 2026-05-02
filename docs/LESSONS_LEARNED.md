@@ -1,10 +1,10 @@
-# Project Arctic Shift: Lessons Learned (Reddit to Parquet)
+# Project Reddit ZST to Parquet: Lessons Learned
 
 This document captures the technical challenges and architectural decisions made during the conversion of 20+ years of Reddit archives from ZStandard JSON to Search-Optimized Parquet.
 
 ## 1. Schema Management & Evolution
 *   **The "Superunion" Problem**: Reddit's schema for posts (`RS`) contains over 1,500 unique fields across history. A literal union results in massive metadata overhead.
-*   **Solution: The "Clean Union"**: We used Arctic Shift's statistical JSON schemas to identify fields with >10% usage ("Useful Items"). Remaining obscure fields are captured in a single `extra_json` string column, ensuring 100% data preservation with a sane ~80-column schema.
+*   **Solution: The "Clean Union"**: We used statistical JSON schemas to identify fields with >10% usage ("Useful Items"). Remaining obscure fields are captured in a single `extra_json` string column, ensuring 100% data preservation with a sane ~80-column schema.
 *   **The "Edited" Flip**: One of the most common crashes. Historically, the `edited` field flipped between a Boolean (`true/false`) and a Unix Timestamp. We normalized this to `Int64`.
 
 ## 2. Type Robustness & Arrow Strictness

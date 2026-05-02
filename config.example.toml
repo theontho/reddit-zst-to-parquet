@@ -1,4 +1,4 @@
-# Arctic Shift: Remote Parquet Conversion Configuration
+# Reddit ZST to Parquet: Remote Parquet Conversion Configuration
 # Copy this file to config.local.toml and fill in your details.
 # config.local.toml is ignored by git and is used for machine-specific settings.
 
@@ -24,7 +24,7 @@ timeout_seconds = 300
 
 [paths]
 # The first available/writable path will be used for temporary files
-temp_dir_fallbacks = ["./conversion_temp", "~/Documents/arctic_shift_temp"]
+temp_dir_fallbacks = ["./conversion_temp", "~/Documents/reddit_parquet_temp"]
 nfs_mount_path = "~/qnap"
 # Optional overrides for CLI tools (auto-detected by default, e.g., "duckdb.exe" on Windows)
 # duckdb_path = "duckdb"

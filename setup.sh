@@ -3,7 +3,7 @@
 # Reddit ZST to Parquet: One-Command Setup Script for macOS
 set -e
 
-echo "🚀 Starting Reddit ZST to Parquet (Arctic Shift) Setup..."
+echo "🚀 Starting Reddit ZST to Parquet Setup..."
 
 # 1. Check for Homebrew
 if ! command -v brew &> /dev/null; then
@@ -21,7 +21,7 @@ uv sync
 
 # 4. Initialize Local Directories and Dependencies
 echo "📂 Preparing local temporary directories and dependencies..."
-mkdir -p ~/arctic_shift_temp
+mkdir -p ~/reddit_parquet_temp
 mkdir -p conversion_temp
 mkdir -p deps
 

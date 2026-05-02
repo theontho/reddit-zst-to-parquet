@@ -262,7 +262,7 @@ class Heartbeat:
 
             logging.info(f"Heartbeat: {self.label} (elapsed {time_str})")
             print(f"CLAIM_STAGE: {self.label} (elapsed {time_str})", flush=True)
-            update_terminal_title(f"Arctic Shift - {self.label} ({time_str})")
+            update_terminal_title(f"Reddit ZST to Parquet - {self.label} ({time_str})")
             self.stop_event.wait(self.interval)
 
     def __enter__(self):
