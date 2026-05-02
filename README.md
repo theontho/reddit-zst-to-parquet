@@ -29,8 +29,21 @@ Install `zstd` and `duckdb` via your package manager and [install uv](https://gi
 
 ### 2. Project Setup
 ```bash
-cd parquet_converter
-uv sync
+# Clone the repository
+git clone https://github.com/theontho/reddit-zst-to-parquet.git
+cd reddit-zst-to-parquet
+
+# Run the automated setup script
+# This installs system dependencies (brew), sets up the uv environment,
+# and clones the necessary 'arctic_shift' schema repository.
+./setup.sh
+```
+
+### Dependencies & Schemas
+This project relies on the excellent [arctic_shift](https://github.com/ArthurHeitmann/arctic_shift) repository for archive schemas and processing logic. The `setup.sh` script automatically clones this into the `deps/` folder. If you are setting up manually, ensure you clone it:
+```bash
+mkdir -p deps
+git clone https://github.com/ArthurHeitmann/arctic_shift.git deps/arctic_shift
 ```
 
 ---

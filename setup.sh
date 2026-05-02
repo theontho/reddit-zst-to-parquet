@@ -27,9 +27,7 @@ mkdir -p deps
 
 if [ ! -d "deps/arctic_shift" ]; then
     echo "📥 Cloning arctic_shift dependency (schemas/scripts)..."
-    # Note: Using local path as default, but in a real repo this would be a GitHub URL
-    git clone https://github.com/arctic-shift/arctic_shift.git deps/arctic_shift || \
-    git clone ~/src/arctic_shift deps/arctic_shift
+    git clone https://github.com/ArthurHeitmann/arctic_shift.git deps/arctic_shift
 fi
 
 # 5. Connectivity Check
