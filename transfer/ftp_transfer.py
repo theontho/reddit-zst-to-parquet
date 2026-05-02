@@ -325,15 +325,11 @@ class FtpTransferHandler(TransferHandler):
             try:
                 ftp = self._get_ftp()
                 files = ftp.nlst(remote_filename)
-                return remote_filename in files or any(
-                    f.endswith(remote_filename) for f in files
-                )
+                return remote_filename in files or any(f.endswith(remote_filename) for f in files)
             except Exception:
                 return False
 
-    def download_file(
-        self, remote_filename: str, local_path: str, expected_size: int
-    ) -> tuple[bool, float]:
+    def download_file(self, remote_filename: str, local_path: str, expected_size: int) -> tuple[bool, float]:
         logging.debug(f"Downloading {remote_filename} via FTP to {local_path}...")
         start_time = time.time()
         try:
@@ -341,9 +337,7 @@ class FtpTransferHandler(TransferHandler):
             # Ensure local directory exists
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
-            progress_reporter = FtpProgressReporter(
-                expected_size, description=f"Downloading {remote_filename}"
-            )
+            progress_reporter = FtpProgressReporter(expected_size, description=f"Downloading {remote_filename}")
             with open(local_path, "wb") as fp:
                 # Combine file writing and progress reporting in the callback
                 ftp.retrbinary(
@@ -378,9 +372,7 @@ class FtpTransferHandler(TransferHandler):
                     )
                     return True, elapsed_time
 
-            logging.exception(
-                f"Error downloading {remote_filename} via FTP ({type(e).__name__}): {e}"
-            )
+            logging.exception(f"Error downloading {remote_filename} via FTP ({type(e).__name__}): {e}")
             if os.path.exists(local_path):
                 with contextlib.suppress(OSError):
                     os.remove(local_path)
@@ -401,9 +393,7 @@ class FtpTransferHandler(TransferHandler):
                 old_timeout = ftp.sock.gettimeout()
                 ftp.sock.settimeout(3600)
 
-            progress_reporter = FtpProgressReporter(
-                local_size, description=f"Uploading {os.path.basename(local_path)}"
-            )
+            progress_reporter = FtpProgressReporter(local_size, description=f"Uploading {os.path.basename(local_path)}")
 
             with open(local_path, "rb") as fp:
                 ftp.storbinary(f"STOR {remote_filename}", fp, callback=progress_reporter.callback)
@@ -423,9 +413,7 @@ class FtpTransferHandler(TransferHandler):
 
     def check_prerequisites(self) -> bool:
         # ftplib is part of Python's standard library, so no external commands to check.
-        logging.info(
-            "FTP prerequisites check: ftplib is part of standard library (assumed available)."
-        )
+        logging.info("FTP prerequisites check: ftplib is part of standard library (assumed available).")
         return True  # Always true unless targeting very old/minimal Python env
 
     def check_connection(self) -> bool:

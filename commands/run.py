@@ -31,9 +31,7 @@ def run_conversion_loop():
     config.validate_config(config.config_data)
 
     # --- Basic Setup ---
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - [%(module)s] %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - [%(module)s] %(message)s")
     start_time = time.time()
     logging.info("Starting remote parquet conversion process.")
     update_terminal_title("Remote Parquet Conversion - Initializing")
@@ -85,9 +83,7 @@ def run_conversion_loop():
     # Ensure persistent conversion base directory exists
     try:
         os.makedirs(config.CONVERSION_TEMP_BASE_DIR, exist_ok=True)
-        logging.info(
-            f"Ensured conversion temp base directory exists: {config.CONVERSION_TEMP_BASE_DIR}"
-        )
+        logging.info(f"Ensured conversion temp base directory exists: {config.CONVERSION_TEMP_BASE_DIR}")
     except OSError as e:
         logging.error(
             f"Could not create conversion temp base directory {config.CONVERSION_TEMP_BASE_DIR}: {e}. Exiting."
@@ -103,9 +99,7 @@ def run_conversion_loop():
     try:
         zst_files_with_sizes, parquet_files, other_files = transfer_handler.list_remote_files()
     except Exception as e:
-        logging.error(
-            f"Failed to list remote files using {transfer_handler.__class__.__name__}: {e}"
-        )
+        logging.error(f"Failed to list remote files using {transfer_handler.__class__.__name__}: {e}")
         logging.exception("Traceback:")
         transfer_handler.close()
         return
@@ -138,9 +132,7 @@ def run_conversion_loop():
     )
 
     if not files_to_process_with_sizes:
-        logging.info(
-            "All applicable remote .zst files appear to be processed or skipped. Nothing to do."
-        )
+        logging.info("All applicable remote .zst files appear to be processed or skipped. Nothing to do.")
         update_terminal_title("Remote Parquet Conversion - Complete (No Action)")
         return
 
@@ -151,16 +143,12 @@ def run_conversion_loop():
     total_to_process = len(files_to_process_with_sizes)
     consecutive_failures = 0
 
-    logging.info(
-        f"Starting processing loop. Total files to process/retry: {total_to_process}."
-    )
+    logging.info(f"Starting processing loop. Total files to process/retry: {total_to_process}.")
     update_terminal_title(f"Remote Parquet Conversion - Processing 0/{total_to_process}")
 
     for i, (zst_file, size) in enumerate(files_to_process_with_sizes):
         size_str = f"({format_size(size)})" if size > 0 else "(size unknown)"
-        header_log_content = (
-            f"--- Processing {zst_file} {size_str} ({i + 1}/{total_to_process}) ---"
-        )
+        header_log_content = f"--- Processing {zst_file} {size_str} ({i + 1}/{total_to_process}) ---"
         logging.info("-" * len(header_log_content))
         logging.info(header_log_content)
         logging.info("-" * len(header_log_content))
@@ -170,11 +158,7 @@ def run_conversion_loop():
             current_tmp_name = f"{Path(zst_file).stem}.zst_parquet_tmp"
             for item in os.listdir(config.CONVERSION_TEMP_BASE_DIR):
                 item_path = os.path.join(config.CONVERSION_TEMP_BASE_DIR, item)
-                if (
-                    os.path.isdir(item_path)
-                    and item.endswith(".zst_parquet_tmp")
-                    and item != current_tmp_name
-                ):
+                if os.path.isdir(item_path) and item.endswith(".zst_parquet_tmp") and item != current_tmp_name:
                     logging.info(f"Cleaning up stale temp folder from other file: {item}")
                     shutil.rmtree(item_path)
         except Exception as e:
@@ -206,9 +190,7 @@ def run_conversion_loop():
             )
 
         if consecutive_failures >= config.MAX_CONSECUTIVE_FAILURES:
-            logging.error(
-                f"Stopping script due to {consecutive_failures} consecutive processing failures."
-            )
+            logging.error(f"Stopping script due to {consecutive_failures} consecutive processing failures.")
             update_terminal_title("Remote Parquet Conversion - STOPPED (Failures)")
             break
 

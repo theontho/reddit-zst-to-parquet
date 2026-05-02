@@ -35,18 +35,14 @@ def get_machine_metadata():
         if sys.platform == "darwin":
             try:
                 cpu_info = (
-                    subprocess.check_output(
-                        ["sysctl", "-n", "machdep.cpu.brand_string"], stderr=subprocess.DEVNULL
-                    )
+                    subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], stderr=subprocess.DEVNULL)
                     .decode()
                     .strip()
                 )
                 # Attempt to get P/E core split
                 try:
                     p_cores = int(
-                        subprocess.check_output(
-                            ["sysctl", "-n", "hw.perflevel0.logicalcpu"], stderr=subprocess.DEVNULL
-                        )
+                        subprocess.check_output(["sysctl", "-n", "hw.perflevel0.logicalcpu"], stderr=subprocess.DEVNULL)
                         .decode()
                         .strip()
                     )
@@ -56,9 +52,7 @@ def get_machine_metadata():
 
                 try:
                     e_cores = int(
-                        subprocess.check_output(
-                            ["sysctl", "-n", "hw.perflevel1.logicalcpu"], stderr=subprocess.DEVNULL
-                        )
+                        subprocess.check_output(["sysctl", "-n", "hw.perflevel1.logicalcpu"], stderr=subprocess.DEVNULL)
                         .decode()
                         .strip()
                     )
@@ -82,9 +76,7 @@ def get_machine_metadata():
             if platform.system() == "Darwin":
                 try:
                     sc_name = (
-                        subprocess.check_output(
-                            ["scutil", "--get", "LocalHostName"], stderr=subprocess.DEVNULL
-                        )
+                        subprocess.check_output(["scutil", "--get", "LocalHostName"], stderr=subprocess.DEVNULL)
                         .decode()
                         .strip()
                     )
@@ -187,9 +179,7 @@ def cleanup_orphan_temp_dirs(log_data, temp_base_dir):
             is_old = (time.time() - mtime) > 900  # 15 minutes
 
             if status not in ["downloading", "converting"] or is_old:
-                logging.info(
-                    f"Cleaning up orphan temp directory: {entry} (Status: {status or 'unknown'})"
-                )
+                logging.info(f"Cleaning up orphan temp directory: {entry} (Status: {status or 'unknown'})")
                 shutil.rmtree(entry_path, ignore_errors=True)
     except Exception as e:
         logging.warning(f"Error during orphan cleanup: {e}")
@@ -237,9 +227,7 @@ def cleanup_local_temp(temp_dir: str):
         shutil.rmtree(temp_dir)
         logging.info(f"Successfully removed {temp_dir}")
     except OSError as e:
-        logging.warning(
-            f"Could not remove local directory {temp_dir}: {e}. Manual cleanup might be needed."
-        )
+        logging.warning(f"Could not remove local directory {temp_dir}: {e}. Manual cleanup might be needed.")
 
 
 class Heartbeat:

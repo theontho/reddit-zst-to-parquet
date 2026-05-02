@@ -29,10 +29,7 @@ class ManifestDownloader:
             return
 
         chunk_size = (len(self.manifest_names) + self.max_workers - 1) // self.max_workers
-        chunks = [
-            self.manifest_names[i : i + chunk_size]
-            for i in range(0, len(self.manifest_names), chunk_size)
-        ]
+        chunks = [self.manifest_names[i : i + chunk_size] for i in range(0, len(self.manifest_names), chunk_size)]
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             executor.map(self.worker, chunks)
@@ -83,14 +80,12 @@ def run_fleet_report():
         return
 
     print(f"\n[1/5] Connecting via {method.upper()} and auditing archive...")
-    zst_list, parquet, other = handler.list_remote_files()
+    zst_list, _parquet, other = handler.list_remote_files()
 
     # 1. Archive Audit (Weighted)
-    zst_sizes = {name: size for name, size in zst_list}
+    zst_sizes = dict(zst_list)
     all_manifest_files = [f for f in other if f.endswith(".manifest.json")]
-    manifest_names = {
-        f.replace(".parquet.manifest.json", ".zst").replace("new-", "") for f in all_manifest_files
-    }
+    manifest_names = {f.replace(".parquet.manifest.json", ".zst").replace("new-", "") for f in all_manifest_files}
 
     total_bytes = sum(zst_sizes.values())
     if total_bytes == 0:
@@ -102,14 +97,12 @@ def run_fleet_report():
 
     total_files = len(zst_sizes)
     done_files = len(manifest_names.intersection(zst_sizes.keys()))
-    pending_files = total_files - done_files
+    total_files - done_files
 
     print("\n--- ARCHIVE STATUS (BY VOLUME) ---")
     print(f"Total Data:     {format_size(total_bytes)}")
     print(f"Completed:      {format_size(done_bytes)} ({(done_bytes / total_bytes * 100):.1f}%)")
-    print(
-        f"Pending:        {format_size(pending_bytes)} ({(pending_bytes / total_bytes * 100):.1f}%)"
-    )
+    print(f"Pending:        {format_size(pending_bytes)} ({(pending_bytes / total_bytes * 100):.1f}%)")
     print(f"File Count:     {done_files} / {total_files} ({(done_files / total_files * 100):.1f}%)")
 
     # 2. Timeline Progress
@@ -224,7 +217,7 @@ def run_fleet_report():
             dl_1gb, dl_mb_s = get_stats(s["total_dl_duration_sec"], s["total_zst_bytes_dl"])
             conv_1gb, conv_mb_s = get_stats(s["total_conv_duration_sec"], s["total_zst_bytes_conv"])
             up_1gb, up_mb_s = get_stats(s["total_up_duration_sec"], s["total_parquet_bytes_up"])
-            cycle_1gb, cycle_mb_s = get_stats(s["total_processing_time"], s["total_zst_bytes_conv"])
+            cycle_1gb, _cycle_mb_s = get_stats(s["total_processing_time"], s["total_zst_bytes_conv"])
 
             cycle_gb_min = 60 / cycle_1gb if cycle_1gb > 0 else 0
 
@@ -265,9 +258,7 @@ def run_fleet_report():
                     stale = ts != datetime.min and datetime.now() - ts > timedelta(hours=4)
 
                     if stale:
-                        print(
-                            f"M: {machine:<25} | S: {stage:<15} | F: {zst_file} (STALE - DELETING)"
-                        )
+                        print(f"M: {machine:<25} | S: {stage:<15} | F: {zst_file} (STALE - DELETING)")
                         handler.delete_file(claim)
                         continue
 
@@ -293,9 +284,7 @@ def run_fleet_report():
             print(f"M: {machine:<25} | S: {keep['stage']:<15} | F: {keep['file']}")
 
             for ghost in machine_claims[1:]:
-                print(
-                    f"M: {machine:<25} | S: {ghost['stage']:<15} | F: {ghost['file']} (GHOST - DELETING)"
-                )
+                print(f"M: {machine:<25} | S: {ghost['stage']:<15} | F: {ghost['file']} (GHOST - DELETING)")
                 handler.delete_file(ghost["filename"])
 
     else:
@@ -311,9 +300,7 @@ def run_fleet_report():
         if m_name in machine_stats:
             s = machine_stats[m_name]
             if s["total_processing_time"] > 0:
-                m_instance_throughput = (s["total_zst_bytes_conv"] / (1024 * 1024)) / s[
-                    "total_processing_time"
-                ]
+                m_instance_throughput = (s["total_zst_bytes_conv"] / (1024 * 1024)) / s["total_processing_time"]
                 total_mb_per_sec += float(m_instance_throughput)
 
     if total_mb_per_sec == 0:
@@ -333,9 +320,7 @@ def run_fleet_report():
 
         print("\n--- COMPLETION ESTIMATE ---")
         print(f"Fleet Speed:    {gb_per_min_fleet:.2f} GB/min ({source})")
-        print(
-            f"Raw ETA:        {finish_raw.strftime('%Y-%m-%d %H:%M')} ({int(raw_mins // 60)}h {int(raw_mins % 60)}m)"
-        )
+        print(f"Raw ETA:        {finish_raw.strftime('%Y-%m-%d %H:%M')} ({int(raw_mins // 60)}h {int(raw_mins % 60)}m)")
         print(
             f"With Buffer:    {finish_buffer.strftime('%Y-%m-%d %H:%M')} ({int(buffer_mins // 60)}h {int(buffer_mins % 60)}m)"
         )

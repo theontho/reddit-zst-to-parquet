@@ -1,4 +1,3 @@
-
 """Configuration loader for the remote parquet conversion script."""
 
 import os
@@ -44,10 +43,9 @@ config_data: dict[str, Any] = {
         "chunk_size": 1000000,
         "test_run_chunk_size": 10000,
         "compression_ratio_estimate": 16,
-        "conversion_method": "chunked", # "chunked" is recommended for stability. "streamed" is faster but prone to OOM on large files.
+        "conversion_method": "chunked",  # "chunked" is recommended for stability. "streamed" is faster but prone to OOM on large files.
         "fallback_to_chunked": True,
     },
-
     "duckdb": {
         "threads": None,  # Will be auto-detected if None
         "memory_limit_gb": None,  # Will be auto-detected if None
@@ -85,8 +83,6 @@ def get_dynamic_defaults():
     return rec_threads, rec_memory
 
 
-
-
 def load_toml_config(path, current_config):
     """Loads and merges TOML config into current_config."""
     if os.path.exists(path):
@@ -106,6 +102,7 @@ def load_toml_config(path, current_config):
 load_toml_config(EXAMPLE_CONFIG, config_data)
 load_toml_config(LOCAL_CONFIG, config_data)
 
+
 # --- Validation (Fail Fast) ---
 def validate_config(config_data):
     method = config_data["transfer"]["method"].lower()
@@ -115,13 +112,14 @@ def validate_config(config_data):
         required_remote = ["host", "user", "directory"]
         missing_remote = [f"remote.{k}" for k in required_remote if not config_data["remote"].get(k)]
         if missing_remote:
-             print(f"Warning: Missing recommended configuration for {method}: {', '.join(missing_remote)}")
+            print(f"Warning: Missing recommended configuration for {method}: {', '.join(missing_remote)}")
 
     if method == "ftp" and not config_data["ftp"].get("password"):
         raise ValueError("FTP method selected but ftp.password is missing in configuration.")
 
     if method == "local" and not config_data["remote"].get("directory"):
         raise ValueError("Local method selected but remote.directory (used as local source) is missing.")
+
 
 # validate_config(config_data) # Removed auto-validation on import
 
@@ -165,6 +163,7 @@ ENABLE_TERMINAL_TITLE_UPDATE = config_data["pipeline"]["enable_terminal_title_up
 # --- DuckDB Config with Dynamic Fallbacks ---
 try:
     import psutil
+
     TOTAL_RAM_GB = psutil.virtual_memory().total / (1024**3)
 except ImportError:
     TOTAL_RAM_GB = 16.0
@@ -190,4 +189,3 @@ ZSTD_TERMINATION_TIMEOUT_SECONDS = config_data["zstd"]["termination_timeout_seco
 CHUNK_SIZE = config_data["pipeline"]["chunk_size"]
 TEST_RUN_CHUNK_SIZE = config_data["pipeline"]["test_run_chunk_size"]
 COMPRESSION_RATIO_ESTIMATE = config_data["pipeline"]["compression_ratio_estimate"]
-

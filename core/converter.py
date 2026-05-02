@@ -1,4 +1,3 @@
-
 """Handles the execution of the Zstandard to Parquet conversion script."""
 
 import contextlib
@@ -35,7 +34,6 @@ def _execute_converter_script(
     working_dir: str,
     on_claim_stage_change=None,
 ) -> dict:
-
     """Executes a specific converter script and handles its output."""
     input_filename = os.path.basename(local_zst_path)
     output_filename = os.path.basename(local_parquet_path)
@@ -44,6 +42,7 @@ def _execute_converter_script(
 
     # Always run the script via the current Python interpreter for cross-platform stability
     import sys
+
     cmd = [sys.executable, script_path, input_filename, "-o", output_filename]
 
     env = os.environ.copy()
@@ -92,8 +91,6 @@ def _execute_converter_script(
         return {"success": False, "oom": False}
 
 
-
-
 def convert_to_parquet(
     local_zst_path: str, local_parquet_path: str, working_dir: str, on_claim_stage_change=None
 ) -> bool:
@@ -132,7 +129,6 @@ def convert_to_parquet(
 
     script_path = method_map.get(primary_method, CHUNKED_CONVERTER_PATH)
 
-
     # Log estimated size
     try:
         compressed_size = os.path.getsize(local_zst_path)
@@ -159,20 +155,14 @@ def convert_to_parquet(
         return os.path.exists(local_parquet_path)
 
     # 3. Handle Fallback (if enabled and applicable)
-    if (
-        FALLBACK_TO_CHUNKED
-        and primary_method != "chunked"
-        and os.path.basename(script_path) != "chunked_engine.py"
-    ):
+    if FALLBACK_TO_CHUNKED and primary_method != "chunked" and os.path.basename(script_path) != "chunked_engine.py":
         fallback_reason = "OOM" if result["oom"] else "failure"
         logging.warning(
             f"Primary method ({primary_method}) failed ({fallback_reason}). Falling back to chunked converter..."
         )
 
         if on_claim_stage_change:
-            on_claim_stage_change(
-                f"fallback_to_chunked_after_{primary_method}_{fallback_reason}"
-            )
+            on_claim_stage_change(f"fallback_to_chunked_after_{primary_method}_{fallback_reason}")
 
         # Clean up any partial output from the failed primary attempt
         if os.path.exists(local_parquet_path):

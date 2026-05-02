@@ -22,7 +22,7 @@ class LocalTransferHandler(TransferHandler):
         self.base_dir = Path(config.REMOTE_DIR).expanduser().resolve()
         logger.info(f"Local Transfer Handler initialized. Source directory: {self.base_dir}")
 
-    def _resolve_path(self, relative_path):
+    def _resolve_path(self, relative_path: str) -> Path:
         """Resolves the absolute path within the configured base directory."""
         clean_relative_path = Path(os.path.normpath(relative_path).lstrip("/"))
         absolute_path = (self.base_dir / clean_relative_path).resolve()
@@ -35,7 +35,7 @@ class LocalTransferHandler(TransferHandler):
             )
         return absolute_path
 
-    def _display_speed(self, start_time, end_time, file_size_bytes):
+    def _display_speed(self, start_time: float, end_time: float, file_size_bytes: int) -> None:
         """Calculates and logs transfer speed."""
         duration = end_time - start_time
         if duration == 0:
@@ -89,9 +89,7 @@ class LocalTransferHandler(TransferHandler):
             logger.error(f"Error listing files in {self.base_dir}: {e}")
             raise
 
-    def download_file(
-        self, remote_filename: str, local_path: str, expected_size: int = 0
-    ) -> tuple[bool, float]:
+    def download_file(self, remote_filename: str, local_path: str, expected_size: int = 0) -> tuple[bool, float]:
         """Creates a symlink from the source directory to the temp processing path."""
         source_path = self._resolve_path(remote_filename)
         dest_path = Path(local_path)

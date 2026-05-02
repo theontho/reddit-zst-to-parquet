@@ -108,7 +108,6 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
     working_dir = os.path.dirname(os.path.abspath(output_path))
     abs_working_dir = os.path.abspath(working_dir)
 
-
     print(f"Using Streamed-DuckDB-Converter for: {input_path} ({file_size_gb:.2f} GB)")
 
     print(f"Resource Profile: {limit_gb}GB RAM limit, {active_threads} threads")
@@ -209,12 +208,9 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
         if os.path.exists(scratch_parquet):
             os.remove(scratch_parquet)
 
-
-
         zstd_proc.wait()
 
         con.close()
-
 
         # Generate Manifest
         manifest_path = output_path + ".manifest.json"
@@ -240,9 +236,7 @@ def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> 
         parquet_path_sql = f"'{parquet_path}'"
 
         with duckdb.connect(":memory:") as con:
-            schema_info = con.execute(
-                f"DESCRIBE SELECT * FROM read_parquet({parquet_path_sql})"
-            ).fetchall()
+            schema_info = con.execute(f"DESCRIBE SELECT * FROM read_parquet({parquet_path_sql})").fetchall()
             columns = [r[0] for r in schema_info]
             types = {r[0]: r[1] for r in schema_info}
 
@@ -260,9 +254,7 @@ def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> 
             manifest = {
                 "filename": os.path.basename(parquet_path),
                 "file_size": os.path.getsize(parquet_path),
-                "last_modified": time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(parquet_path))
-                ),
+                "last_modified": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(os.path.getmtime(parquet_path))),
                 "row_count": total_rows,
                 "conversion_method": "streamed",
                 "schema": types,
@@ -282,7 +274,6 @@ def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> 
     except Exception as e:
         print(f"Error generating manifest: {e}")
         return False
-
 
 
 import argparse

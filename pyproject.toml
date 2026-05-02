@@ -66,13 +66,14 @@ explicit_package_bases = true
 mypy_path = "."
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "N", "B", "C4", "SIM", "RUF"]
-ignore = []
+ignore = ["E501", "N999", "SIM105", "B027", "B023", "E402", "E722"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-single-line = false
+known-first-party = ["core", "commands", "engines", "transfer", "scripts"]

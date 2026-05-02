@@ -31,7 +31,7 @@ def run_generate_manifests(force=False):
 
     print(f"Connecting via {method.upper()}...")
     try:
-        zst_files, all_parquet, other_files = handler.list_remote_files()
+        _zst_files, all_parquet, other_files = handler.list_remote_files()
 
         # Filter for Parquet files
         parquet_files = [f for f in all_parquet if f.endswith(".parquet")]
@@ -50,6 +50,7 @@ def run_generate_manifests(force=False):
 
                 # Download to a temporary file for analysis (symlinked if local)
                 import tempfile
+
                 with tempfile.NamedTemporaryFile(suffix=".parquet") as tmp:
                     # We don't know the size, but download_file verification is optional if expected_size is 0
                     success, _ = handler.download_file(filename, tmp.name, expected_size=0)
@@ -75,6 +76,7 @@ def run_generate_manifests(force=False):
 
                 # Write to temp file first for upload
                 import tempfile
+
                 with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
                     tmp.write(manifest_json)
                     tmp_name = tmp.name
