@@ -1,5 +1,7 @@
 # Reddit ZST to Parquet
 
+> **Warning**: This toolset is currently somewhat rough around the edges. However, it worked well enough to successfully convert my entire multi-terabyte download. Use with care.
+
 A high-performance, standalone toolset for converting massive Reddit Zstandard (`.zst`) dumps into analytical Parquet files.
 
 ## Features
