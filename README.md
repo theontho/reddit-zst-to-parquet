@@ -66,6 +66,18 @@ To run the converter on a single machine using local files:
     uv run reddit-zst-to-parquet run
     ```
 
+### Preflight Check
+Before starting a long conversion, validate the local machine, required binaries, temp directory, and transfer backend:
+```bash
+uv run reddit-zst-to-parquet precheck
+```
+
+To inspect configuration paths or validate the loaded config without printing secrets:
+```bash
+uv run reddit-zst-to-parquet config --paths
+uv run reddit-zst-to-parquet config --validate
+```
+
 ---
 
 ## Multi-Node Configuration
@@ -88,7 +100,7 @@ This tool:
 
 ## Project Structure
 
-- `reddit-zst-to-parquet`: The CLI entry point with subcommands (`run`, `report`, `bench`, `verify`, `manifests`).
+- `reddit-zst-to-parquet`: The CLI entry point with subcommands (`run`, `precheck`, `config`, `report`, `bench`, `verify`, `manifests`).
 - `core/`: Shared logic, configuration, and processing coordination.
 - `commands/`: Subcommand implementations.
 - `transfer/`: Handlers for different protocols (FTP, Rsync, NFS, Local).
@@ -102,3 +114,15 @@ This tool:
 - **Python**: 3.10+
 - **System Tools**: `zstd`, `duckdb` (must be in PATH).
 - **Dependency Manager**: [uv](https://github.com/astral-sh/uv).
+
+## Development
+
+Useful local checks:
+```bash
+make ci
+```
+
+Install pre-commit hooks:
+```bash
+make setup-dev
+```

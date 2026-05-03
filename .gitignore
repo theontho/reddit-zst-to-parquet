@@ -1,11 +1,38 @@
-.mypy_cache
-.venv
-.ruff_cache
-.pytest_cache
-__pycache__
-.DS_Store
-.vscode
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.pyrefly/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build and coverage outputs
+build/
 dist/
+*.egg-info/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+
+# Local environment and scratch space
+.env
+.env.*
+!.env.example
+out/
+tmp/
+scratch/
 
 config.local.toml
 conversion_log.json

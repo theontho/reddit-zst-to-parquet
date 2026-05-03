@@ -25,7 +25,7 @@ from transfer.nfs_transfer import NfsTransferHandler
 from transfer.rsync_ssh_transfer import RsyncSshTransferHandler
 
 
-def run_conversion_loop():
+def run_conversion_loop(only: str | None = None, force: bool = False):
     """Main function to coordinate the remote Zstandard to Parquet conversion process."""
     # --- Configuration Validation ---
     config.validate_config(config.config_data)
@@ -104,6 +104,14 @@ def run_conversion_loop():
         transfer_handler.close()
         return
 
+    if only:
+        matching_files = [(filename, size) for filename, size in zst_files_with_sizes if filename == only]
+        if not matching_files:
+            logging.error(f"Requested --only file is not present remotely: {only}")
+            transfer_handler.close()
+            return
+        zst_files_with_sizes = matching_files
+
     if not zst_files_with_sizes and not parquet_files and not log_data.get("files"):
         logging.warning(
             "Could not retrieve file lists or remote directory is empty, and log is empty/invalid. Exiting."
@@ -124,6 +132,12 @@ def run_conversion_loop():
     files_to_process_with_sizes = get_files_to_process(
         log_data, zst_files_with_sizes, parquet_files, other_files, transfer_handler, machine_meta
     )
+    if only:
+        if force:
+            logger.update_log_entry(log_data, only, "pending")
+            logger.save_log(log_data)
+            logging.warning(f"Force mode enabled for {only}; existing outputs may be replaced.")
+        files_to_process_with_sizes = zst_files_with_sizes
 
     # Sort by size (ascending - smallest first)
     files_to_process_with_sizes.sort(key=lambda item: item[1], reverse=False)
@@ -176,6 +190,7 @@ def run_conversion_loop():
             total_files=total_to_process,
             machine_meta=machine_meta,
             temp_dir_used=active_temp_dir,
+            force=force,
         )
 
         if result == "success":

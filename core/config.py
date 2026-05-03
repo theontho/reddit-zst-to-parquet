@@ -116,6 +116,8 @@ def validate_config(config_data):
 
     if method == "ftp" and not config_data["ftp"].get("password"):
         raise ValueError("FTP method selected but ftp.password is missing in configuration.")
+    if method == "ftp" and config_data["ftp"].get("password") == "YOUR_FTP_PASSWORD_HERE":
+        raise ValueError("FTP method selected but ftp.password still contains the example placeholder.")
 
     if method == "local" and not config_data["remote"].get("directory"):
         raise ValueError("Local method selected but remote.directory (used as local source) is missing.")

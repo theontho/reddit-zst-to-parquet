@@ -1,5 +1,6 @@
 from typing import cast
 
+from commands.run import run_conversion_loop
 from core import config
 from core.converter import convert_to_parquet
 from core.processor import get_files_to_process, process_file
@@ -177,3 +178,78 @@ def test_get_files_to_process_skips_when_manifest_exists():
     )
 
     assert files == []
+
+
+def test_run_only_reprocesses_completed_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "TRANSFER_METHOD", "local")
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "CONVERSION_TEMP_BASE_DIR", str(tmp_path / "temp"))
+
+    calls: list[tuple[str, bool]] = []
+
+    class _RunOnlyTransfer(_ClaimedTransfer):
+        def __init__(self):
+            self.closed = False
+
+        def list_remote_files(self):
+            return [("RC_2005-01.zst", 10), ("RC_2005-02.zst", 20)], set(), {"new-RC_2005-01.parquet.manifest.json"}
+
+        def check_prerequisites(self):
+            return True
+
+        def check_connection(self):
+            return True
+
+        def close(self):
+            self.closed = True
+
+    def fake_process_file(**kwargs):
+        calls.append((kwargs["zst_filename"], kwargs["force"]))
+        return "success"
+
+    monkeypatch.setattr("commands.run.LocalTransferHandler", _RunOnlyTransfer)
+    monkeypatch.setattr("commands.run.get_machine_metadata", lambda: {})
+    monkeypatch.setattr("commands.run.select_temp_dir", lambda: str(tmp_path / "temp"))
+    monkeypatch.setattr("commands.run.cleanup_orphan_temp_dirs", lambda *_args: None)
+    monkeypatch.setattr("commands.run.process_file", fake_process_file)
+
+    run_conversion_loop(only="RC_2005-01.zst", force=True)
+
+    assert calls == [("RC_2005-01.zst", True)]
+
+
+def test_process_file_force_replaces_existing_claim(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "CONVERSION_TEMP_BASE_DIR", str(tmp_path))
+    deleted_claims = []
+
+    class _ForceClaimTransfer(_ClaimedTransfer):
+        def __init__(self):
+            self.claim_exists = True
+
+        def file_exists(self, remote_filename):
+            return False
+
+        def delete_file(self, remote_filename):
+            deleted_claims.append(remote_filename)
+            self.claim_exists = False
+            return True
+
+        def try_create_claim(self, local_path, remote_filename):
+            return (not self.claim_exists), 0.0
+
+        def upload_file(self, local_path, remote_filename):
+            return True, 0.0
+
+        def download_file(self, remote_filename, local_path, expected_size):
+            return False, 0.0
+
+    result = process_file(
+        zst_filename="RC_2005-01.zst",
+        remote_size=123,
+        log_data={"files": {"RC_2005-01.zst": {"status": "pending"}}},
+        transfer_handler=cast(TransferHandler, _ForceClaimTransfer()),
+        force=True,
+    )
+
+    assert result == "failed"
+    assert deleted_claims == ["RC_2005-01.claim.json"]
