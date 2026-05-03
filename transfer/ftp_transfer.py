@@ -306,6 +306,9 @@ class FtpTransferHandler(TransferHandler):
         try:
             ftp = self._get_ftp()
             ftp.delete(remote_filename)
+            if remote_filename.endswith(".claim.json"):
+                with contextlib.suppress(Exception):
+                    ftp.rmd(f"{remote_filename}.lock")
             logging.debug(f"Successfully deleted remote file: {remote_filename}")
             return True
         except Exception as e:
@@ -427,6 +430,8 @@ class FtpTransferHandler(TransferHandler):
                     logging.error(
                         f"FTP uploaded file size mismatch for {remote_filename}. Expected: {local_size}, Got: {remote_size}."
                     )
+                    with contextlib.suppress(Exception):
+                        ftp.delete(remote_filename)
                     return False, elapsed_time
             except Exception as e:
                 logging.warning(f"Could not verify uploaded FTP file size for {remote_filename}: {e}")
@@ -435,20 +440,36 @@ class FtpTransferHandler(TransferHandler):
         except Exception as e:
             elapsed_time = time.time() - start_time
             logging.error(f"Error uploading {local_path} via FTP: {e}")
+            with contextlib.suppress(Exception):
+                self._get_ftp().delete(remote_filename)
             self.close()  # Close on upload error
             return False, elapsed_time
 
     def try_create_claim(self, local_path: str, remote_filename: str) -> tuple[bool, float]:
         """Creates an FTP claim if absent.
 
-        FTP has no portable atomic named-create primitive, so this is best-effort
-        for FTP only. Local/NFS/rsync handlers use stronger exclusive creation.
+        Uses a sidecar lock directory because FTP has no portable atomic named
+        file-create primitive. MKD is atomic on standard FTP servers.
         """
         start_time = time.time()
+        lock_name = f"{remote_filename}.lock"
         try:
+            ftp = self._get_ftp()
             if self.file_exists(remote_filename):
                 return False, time.time() - start_time
-            return self.upload_file(local_path, remote_filename)
+            try:
+                ftp.mkd(lock_name)
+            except Exception:
+                return False, time.time() - start_time
+
+            success, _ = self.upload_file(local_path, remote_filename)
+            if not success:
+                with contextlib.suppress(Exception):
+                    ftp.rmd(lock_name)
+                return False, time.time() - start_time
+            with contextlib.suppress(Exception):
+                ftp.rmd(lock_name)
+            return True, time.time() - start_time
         except Exception as e:
             logging.error(f"Error creating FTP claim {remote_filename}: {e}")
             self.close()

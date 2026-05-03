@@ -147,11 +147,14 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
 
     dctx = zstd.ZstdDecompressor(max_window_size=2**31)
     with open(input_path, "rb") as f, dctx.stream_reader(f) as reader:
-        text_stream = reader.read().decode("utf-8", errors="replace").splitlines()
+        import io
+
+        text_stream = io.TextIOWrapper(reader, encoding="utf-8", errors="replace")
         writer = None
         batch_data = []
 
         for line in text_stream:
+            line = line.strip()
             if not line:
                 continue
             row = json.loads(line)

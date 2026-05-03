@@ -68,6 +68,8 @@ def get_files_to_process(
 
     for filename, entry in log_files.items():
         status = entry.get("status")
+        expected_parquet = "new-" + Path(filename).stem + ".parquet"
+        expected_manifest = f"{expected_parquet}.manifest.json"
 
         # Skip if file no longer exists remotely (unless it failed previously in a recoverable way)
         recoverable_failure_states = {"download_failed", "upload_failed"}
@@ -75,8 +77,9 @@ def get_files_to_process(
             skipped_remote_missing.append(filename)
             continue
 
-        # Skip if completed
-        if status == "completed":
+        # Treat the manifest as the completion marker. A lone parquet can be
+        # overwritten/repaired, but a manifest means the conversion finalized.
+        if status == "completed" and expected_manifest in remote_other_files:
             continue
 
         # Check for claims
@@ -125,9 +128,8 @@ def get_files_to_process(
             continue
 
         # Skip if Parquet file exists remotely and status isn't a failure/incomplete state
-        expected_parquet = "new-" + Path(filename).stem + ".parquet"
-        # Allow processing if download/upload failed, even if parquet exists (might be old/partial)
-        if expected_parquet in remote_parquet_files and status not in recoverable_failure_states:
+        # Allow processing if only parquet exists; manifest upload may have failed.
+        if expected_manifest in remote_other_files:
             status_str = status or "N/A"
             if status_str not in skipped_parquet_exists:
                 skipped_parquet_exists[status_str] = []
@@ -243,10 +245,11 @@ def process_file(
 
     # --- Last-second Concurrency Check ---
     if not force:
-        # Check if a parquet file or a manifest appeared since we last listed
+        # Check if a manifest appeared since we last listed. A lone parquet is
+        # not enough to skip because manifest upload is the completion marker.
         manifest_filename = f"{parquet_filename}.manifest.json"
-        if transfer_handler.file_exists(parquet_filename) or transfer_handler.file_exists(manifest_filename):
-            logging.info(f"Concurrency check: {parquet_filename} (or manifest) already exists remotely. Skipping.")
+        if transfer_handler.file_exists(manifest_filename):
+            logging.info(f"Concurrency check: {manifest_filename} already exists remotely. Skipping.")
             # Mark as completed in log to avoid checking again
             logger.update_log_entry(log_data, zst_filename, "completed")
             logger.save_log(log_data)
@@ -289,7 +292,7 @@ def process_file(
         success_claim, _ = transfer_handler.try_create_claim(local_claim_path, claim_filename)
         if not success_claim:
             logging.info(f"Failed to create claim for {zst_filename}; it may have been claimed by another worker.")
-            return "failed"
+            return "skipped"
     except Exception as e:
         logging.error(f"Error creating/uploading claim for {zst_filename}: {e}")
         return "failed"
@@ -516,7 +519,6 @@ def process_file(
                     logger.save_log(log_data)
                     update_terminal_title(f"{progress_prefix}FAILED: {zst_filename} (Manifest Upload)")
                     current_status = "upload_failed"
-                    return "failed"
             else:
                 error_msg = f"Manifest file missing after conversion: {local_manifest_path}."
                 logging.error(error_msg)
@@ -524,15 +526,15 @@ def process_file(
                 logger.save_log(log_data)
                 update_terminal_title(f"{progress_prefix}FAILED: {zst_filename} (Manifest Missing)")
                 current_status = "upload_failed"
-                return "failed"
             # ------------------------------
 
-            logging.info(f"Upload complete for {parquet_filename}.")
-            # Final completion log including all performance metrics and machine info
-            logger.update_log_entry(log_data, zst_filename, "completed", perf=perf_metrics)
-            logger.save_log(log_data)
-            current_status = "completed"
-            update_terminal_title(f"{progress_prefix}COMPLETED: {zst_filename}")
+            if current_status != "upload_failed":
+                logging.info(f"Upload complete for {parquet_filename}.")
+                # Final completion log including all performance metrics and machine info
+                logger.update_log_entry(log_data, zst_filename, "completed", perf=perf_metrics)
+                logger.save_log(log_data)
+                current_status = "completed"
+                update_terminal_title(f"{progress_prefix}COMPLETED: {zst_filename}")
         else:
             # Should only be status = completed if logic is correct
             logging.info(f"Skipping upload for {zst_filename}, status is '{current_status}'.")

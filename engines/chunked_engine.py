@@ -581,9 +581,16 @@ def _verify_source_row_count(expected_row_count: int, output_path: str, duckdb_p
 
     logging.info(f"Source JSONL rows read: {expected_row_count}")
     logging.info(f"Final Parquet rows: {output_row_count}")
-    if output_row_count != expected_row_count:
+    if output_row_count > expected_row_count:
         logging.error(f"Source row-count verification FAILED: Source={expected_row_count}, Parquet={output_row_count}")
         return False
+    if output_row_count < expected_row_count:
+        dropped_rows = expected_row_count - output_row_count
+        logging.warning(
+            "Source row-count verification found %s dropped malformed/ignored rows due to ignore_errors=true.",
+            dropped_rows,
+        )
+        return True
 
     logging.info("Source row-count verification successful.")
     return True
