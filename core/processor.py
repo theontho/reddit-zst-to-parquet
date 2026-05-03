@@ -289,6 +289,8 @@ def process_file(
     try:
         with open(local_claim_path, "w", encoding="utf-8") as f:
             json.dump(claim_data, f, indent=2)
+        if force and transfer_handler.file_exists(claim_filename):
+            transfer_handler.delete_file(claim_filename)
         success_claim, _ = transfer_handler.try_create_claim(local_claim_path, claim_filename)
         if not success_claim:
             logging.info(f"Failed to create claim for {zst_filename}; it may have been claimed by another worker.")

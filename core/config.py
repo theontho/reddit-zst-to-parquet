@@ -4,7 +4,10 @@ import os
 import platform
 from typing import Any
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 # --- Default Paths ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -116,6 +119,8 @@ def validate_config(config_data):
 
     if method == "ftp" and not config_data["ftp"].get("password"):
         raise ValueError("FTP method selected but ftp.password is missing in configuration.")
+    if method == "ftp" and config_data["ftp"].get("password") == "YOUR_FTP_PASSWORD_HERE":
+        raise ValueError("FTP method selected but ftp.password still contains the example placeholder.")
 
     if method == "local" and not config_data["remote"].get("directory"):
         raise ValueError("Local method selected but remote.directory (used as local source) is missing.")

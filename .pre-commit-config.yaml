@@ -1,0 +1,32 @@
+repos:
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy .
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: pytest
+        entry: uv run pytest tests/
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+      - id: build-package
+        name: build package
+        entry: uv build
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+      - id: cli-smoke
+        name: cli smoke test
+        entry: uv run reddit-zst-to-parquet --help
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
