@@ -48,9 +48,6 @@ def _execute_converter_script(
     env = os.environ.copy()
     env["SKIP_TERMINAL_TITLE"] = "1"
 
-    env = os.environ.copy()
-    env["SKIP_TERMINAL_TITLE"] = "1"
-
     oom_detected = False
     try:
         process = subprocess.Popen(
@@ -150,9 +147,13 @@ def convert_to_parquet(
         on_claim_stage_change=on_claim_stage_change,
     )
 
-    if result["success"]:
+    if result["success"] and os.path.exists(local_parquet_path):
         logging.info(f"Conversion complete: {local_parquet_path}")
-        return os.path.exists(local_parquet_path)
+        return True
+
+    if result["success"]:
+        logging.error(f"Converter exited successfully but did not create expected output: {local_parquet_path}")
+        result = {"success": False, "oom": result.get("oom", False)}
 
     # 3. Handle Fallback (if enabled and applicable)
     if FALLBACK_TO_CHUNKED and primary_method != "chunked" and os.path.basename(script_path) != "chunked_engine.py":

@@ -99,6 +99,6 @@ This tool:
 
 ## Requirements
 
-- **Python**: 3.12+
+- **Python**: 3.10+
 - **System Tools**: `zstd`, `duckdb` (must be in PATH).
 - **Dependency Manager**: [uv](https://github.com/astral-sh/uv).

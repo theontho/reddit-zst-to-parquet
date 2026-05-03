@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shlex
 import subprocess
 import time
 
@@ -20,6 +21,15 @@ from .base_transfer import TransferHandler
 
 class RsyncSshTransferHandler(TransferHandler):
     """Handles file transfers and listing using rsync and ssh."""
+
+    def _remote_path(self, remote_filename: str | None = None) -> str:
+        remote_dir = str(REMOTE_DIR)
+        if remote_filename:
+            return f"{remote_dir.rstrip('/')}/{remote_filename}"
+        return remote_dir
+
+    def _quoted_remote_path(self, remote_filename: str | None = None) -> str:
+        return shlex.quote(self._remote_path(remote_filename))
 
     def _run_rsync_command(
         self, source: str, destination: str, show_progress: bool = True, operation: str = "transfer"
@@ -250,7 +260,7 @@ class RsyncSshTransferHandler(TransferHandler):
 
     def list_remote_files(self) -> tuple[list[tuple[str, int]], set[str], set[str]]:
         logging.info(f"Listing remote directory {REMOTE_DIR} using SSH 'ls -l'...")
-        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"ls -l {REMOTE_DIR}"]
+        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"ls -l {self._quoted_remote_path()}"]
 
         try:
             result = subprocess.run(
@@ -293,7 +303,7 @@ class RsyncSshTransferHandler(TransferHandler):
 
     def delete_file(self, remote_filename: str) -> bool:
         logging.info(f"Deleting remote file: {remote_filename} via SSH 'rm'")
-        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"rm {REMOTE_DIR}/{remote_filename}"]
+        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"rm -- {self._quoted_remote_path(remote_filename)}"]
         try:
             result = subprocess.run(ssh_cmd, check=False, capture_output=True)
             if result.returncode == 0:
@@ -310,7 +320,7 @@ class RsyncSshTransferHandler(TransferHandler):
 
     def download_to_string(self, remote_filename: str) -> str:
         logging.info(f"Downloading remote file to string: {remote_filename} via SSH 'cat'")
-        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"cat {REMOTE_DIR}/{remote_filename}"]
+        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"cat -- {self._quoted_remote_path(remote_filename)}"]
         try:
             result = subprocess.run(ssh_cmd, capture_output=True, text=True, check=False)
             if result.returncode == 0:
@@ -326,7 +336,7 @@ class RsyncSshTransferHandler(TransferHandler):
 
     def file_exists(self, remote_filename: str) -> bool:
         logging.debug(f"Checking if remote file exists via SSH: {remote_filename}")
-        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"ls {REMOTE_DIR}/{remote_filename}"]
+        ssh_cmd = ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", f"test -e {self._quoted_remote_path(remote_filename)}"]
         try:
             result = subprocess.run(ssh_cmd, capture_output=True, check=False)
             return result.returncode == 0
@@ -334,7 +344,7 @@ class RsyncSshTransferHandler(TransferHandler):
             return False
 
     def download_file(self, remote_filename: str, local_path: str, expected_size: int) -> tuple[bool, float]:
-        remote_full_path = f"{REMOTE_DIR}/{remote_filename}"
+        remote_full_path = self._remote_path(remote_filename)
         source = f"{REMOTE_USER}@{REMOTE_HOST}:{remote_full_path}"
         return self._run_rsync_with_retry(
             source,
@@ -346,7 +356,7 @@ class RsyncSshTransferHandler(TransferHandler):
         )
 
     def upload_file(self, local_path: str, remote_filename: str) -> tuple[bool, float]:
-        remote_full_path = f"{REMOTE_DIR}/{remote_filename}"
+        remote_full_path = self._remote_path(remote_filename)
         destination = f"{REMOTE_USER}@{REMOTE_HOST}:{remote_full_path}"
         return self._run_rsync_with_retry(
             local_path,
@@ -354,6 +364,30 @@ class RsyncSshTransferHandler(TransferHandler):
             "upload",
             os.path.basename(local_path),  # Use local filename for log context
         )
+
+    def try_create_claim(self, local_path: str, remote_filename: str) -> tuple[bool, float]:
+        """Creates a remote claim atomically with POSIX noclobber over SSH."""
+        start_time = time.time()
+        try:
+            with open(local_path, encoding="utf-8") as f:
+                content = f.read()
+            remote_path = self._quoted_remote_path(remote_filename)
+            remote_cmd = f"set -C; cat > {remote_path}"
+            result = subprocess.run(
+                ["ssh", f"{REMOTE_USER}@{REMOTE_HOST}", remote_cmd],
+                input=content,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            elapsed = time.time() - start_time
+            if result.returncode == 0:
+                return True, elapsed
+            logging.info(f"Remote claim already exists or could not be created: {result.stderr.strip()}")
+            return False, elapsed
+        except Exception as e:
+            logging.error(f"Error creating remote claim {remote_filename} via SSH: {e}")
+            return False, time.time() - start_time
 
     def check_prerequisites(self) -> bool:
         logging.info("Checking prerequisite commands (rsync, ssh)...")

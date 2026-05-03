@@ -236,7 +236,7 @@ class FtpTransferHandler(TransferHandler):
                     continue
 
                 size = int(parts[4])
-                filename = parts[-1]
+                filename = " ".join(parts[8:])
 
                 if filename.endswith(".zst"):
                     zst_files_with_sizes.append((filename, size))
@@ -257,7 +257,24 @@ class FtpTransferHandler(TransferHandler):
         logging.info(f"Listing remote directory {REMOTE_DIR} using FTP LIST...")
         try:
             ftp = self._get_ftp()
-            # Fallback to LIST
+            try:
+                zst_files_with_sizes = []
+                parquet_files = set()
+                other_files = set()
+                for name, facts in ftp.mlsd():
+                    if facts.get("type") != "file":
+                        continue
+                    size = int(facts.get("size", "0"))
+                    if name.endswith(".zst"):
+                        zst_files_with_sizes.append((name, size))
+                    elif name.endswith(".parquet"):
+                        parquet_files.add(name)
+                    else:
+                        other_files.add(name)
+                return zst_files_with_sizes, parquet_files, other_files
+            except Exception:
+                logging.debug("FTP MLSD unavailable; falling back to LIST.")
+
             lines: list[str] = []
             ftp.retrlines("LIST", lines.append)  # Use LIST if MLSD fails/not implemented
             zst, parquet, other = self._parse_ftp_list_output(lines)
@@ -289,6 +306,9 @@ class FtpTransferHandler(TransferHandler):
         try:
             ftp = self._get_ftp()
             ftp.delete(remote_filename)
+            if remote_filename.endswith(".claim.json"):
+                with contextlib.suppress(Exception):
+                    ftp.rmd(f"{remote_filename}.lock")
             logging.debug(f"Successfully deleted remote file: {remote_filename}")
             return True
         except Exception as e:
@@ -403,13 +423,57 @@ class FtpTransferHandler(TransferHandler):
 
             elapsed_time = time.time() - start_time
             progress_reporter.finish()
+
+            try:
+                remote_size = ftp.size(remote_filename)
+                if remote_size is not None and remote_size != local_size:
+                    logging.error(
+                        f"FTP uploaded file size mismatch for {remote_filename}. Expected: {local_size}, Got: {remote_size}."
+                    )
+                    with contextlib.suppress(Exception):
+                        ftp.delete(remote_filename)
+                    return False, elapsed_time
+            except Exception as e:
+                logging.warning(f"Could not verify uploaded FTP file size for {remote_filename}: {e}")
             return True, elapsed_time
 
         except Exception as e:
             elapsed_time = time.time() - start_time
             logging.error(f"Error uploading {local_path} via FTP: {e}")
+            with contextlib.suppress(Exception):
+                self._get_ftp().delete(remote_filename)
             self.close()  # Close on upload error
             return False, elapsed_time
+
+    def try_create_claim(self, local_path: str, remote_filename: str) -> tuple[bool, float]:
+        """Creates an FTP claim if absent.
+
+        Uses a sidecar lock directory because FTP has no portable atomic named
+        file-create primitive. MKD is atomic on standard FTP servers.
+        """
+        start_time = time.time()
+        lock_name = f"{remote_filename}.lock"
+        try:
+            ftp = self._get_ftp()
+            if self.file_exists(remote_filename):
+                return False, time.time() - start_time
+            try:
+                ftp.mkd(lock_name)
+            except Exception:
+                return False, time.time() - start_time
+
+            success, _ = self.upload_file(local_path, remote_filename)
+            if not success:
+                with contextlib.suppress(Exception):
+                    ftp.rmd(lock_name)
+                return False, time.time() - start_time
+            with contextlib.suppress(Exception):
+                ftp.rmd(lock_name)
+            return True, time.time() - start_time
+        except Exception as e:
+            logging.error(f"Error creating FTP claim {remote_filename}: {e}")
+            self.close()
+            return False, time.time() - start_time
 
     def check_prerequisites(self) -> bool:
         # ftplib is part of Python's standard library, so no external commands to check.

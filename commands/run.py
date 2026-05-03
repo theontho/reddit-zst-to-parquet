@@ -159,8 +159,10 @@ def run_conversion_loop():
             for item in os.listdir(config.CONVERSION_TEMP_BASE_DIR):
                 item_path = os.path.join(config.CONVERSION_TEMP_BASE_DIR, item)
                 if os.path.isdir(item_path) and item.endswith(".zst_parquet_tmp") and item != current_tmp_name:
-                    logging.info(f"Cleaning up stale temp folder from other file: {item}")
-                    shutil.rmtree(item_path)
+                    age_seconds = time.time() - os.path.getmtime(item_path)
+                    if age_seconds > 24 * 60 * 60:
+                        logging.info(f"Cleaning up stale temp folder from other file: {item}")
+                        shutil.rmtree(item_path)
         except Exception as e:
             logging.debug(f"Non-critical error during global temp cleanup: {e}")
 

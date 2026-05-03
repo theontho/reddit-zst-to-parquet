@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import time
+from importlib import resources
 
 # Add parent directory to path to allow imports from the main package
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -217,24 +218,22 @@ def load_standard_columns(schema_path: str) -> list[str]:
 def load_master_schema(zst_path: str) -> list[str]:
     """Loads the fixed master schema for RC or RS files."""
     filename = os.path.basename(zst_path)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
 
     if "RC_" in filename:
-        master_path = os.path.join(script_dir, "master_schema_rc.json")
+        resource_name = "master_schema_rc.json"
     elif "RS_" in filename:
-        master_path = os.path.join(script_dir, "master_schema_rs.json")
+        resource_name = "master_schema_rs.json"
     else:
         return []
 
-    if os.path.exists(master_path):
-        try:
-            with open(master_path) as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return data
-                return []
-        except Exception as e:
-            logging.error(f"Error loading master schema from {master_path}: {e}")
+    try:
+        schema_text = resources.files("core").joinpath(resource_name).read_text(encoding="utf-8")
+        data = json.loads(schema_text)
+        if isinstance(data, list):
+            return data
+        logging.error(f"Master schema {resource_name} is not a list.")
+    except Exception as e:
+        logging.error(f"Error loading master schema {resource_name}: {e}")
 
     return []
 
@@ -557,17 +556,44 @@ def _verify_merge_counts(
     if input_row_count == output_row_count:
         logging.info("\nVerification successful: Row counts match!")
         return True  # Indicate success
-    else:
-        logging.error(
-            f"\nVerification FAILED: Row counts do not match! Input={input_row_count}, Output={output_row_count}"
+
+    logging.error(f"\nVerification FAILED: Row counts do not match! Input={input_row_count}, Output={output_row_count}")
+    return False  # Indicate failure
+
+
+def _verify_source_row_count(expected_row_count: int, output_path: str, duckdb_path: str, verbose: bool) -> bool:
+    """Verifies final Parquet row count against the decompressed source line count."""
+    logging.info("--- Verifying Source Row Count ---")
+    quoted_output_file = quote_sql_string(output_path)
+    sql_count_output = f"SELECT COUNT(*) FROM read_parquet({quoted_output_file});"
+    output_count_output, output_count_success = run_duckdb_command(
+        [duckdb_path, "-c", sql_count_output], "count final output rows", verbose=verbose
+    )
+
+    if not output_count_success:
+        logging.error("Failed to execute final output row count command.")
+        return False
+
+    output_row_count = parse_duckdb_count(output_count_output)
+    if output_row_count is None:
+        logging.error("Could not determine final output row count.")
+        return False
+
+    logging.info(f"Source JSONL rows read: {expected_row_count}")
+    logging.info(f"Final Parquet rows: {output_row_count}")
+    if output_row_count > expected_row_count:
+        logging.error(f"Source row-count verification FAILED: Source={expected_row_count}, Parquet={output_row_count}")
+        return False
+    if output_row_count < expected_row_count:
+        dropped_rows = expected_row_count - output_row_count
+        logging.warning(
+            "Source row-count verification found %s dropped malformed/ignored rows due to ignore_errors=true.",
+            dropped_rows,
         )
-        # Consider removing the failed output file if verification fails strongly
-        # try:
-        #     os.remove(output_path)
-        #     print(f"Removed output file due to verification failure: {output_path}")
-        # except OSError as e:
-        #     print(f"Error removing failed output file {output_path}: {e}")
-        return False  # Indicate failure
+        return True
+
+    logging.info("Source row-count verification successful.")
+    return True
 
 
 def summarize_schema_differences(chunk_schemas: dict[int, dict[str, str]], verbose: bool = False) -> None:
@@ -1156,8 +1182,14 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 logging.error("\nMerge and verification step failed.")
                 # Keep temp files in this case (handled in finally)
                 sys.exit(1)  # Exit if merge/verify fails
-            else:
-                logging.info(f"\nSuccessfully created merged Parquet file: {output_parquet_path}")
+            if not args.test_run and not _verify_source_row_count(
+                line_count, output_parquet_path, args.duckdb_path, args.verbose
+            ):
+                logging.error("\nSource row-count verification failed.")
+                merge_and_verify_successful = False
+                sys.exit(1)
+
+            logging.info(f"\nSuccessfully created merged Parquet file: {output_parquet_path}")
 
         else:  # --no-merge specified
             logging.info("\nSkipping final merge step (--no-merge specified).")

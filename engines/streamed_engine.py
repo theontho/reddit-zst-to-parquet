@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 
 # Add parent directory to path to allow imports from the main package
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -72,7 +73,7 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
     schema_json = find_schema_for_file(input_path)
     if not schema_json:
         print(f"Error: Could not find schema for {input_path}. Skipping.")
-        return
+        sys.exit(1)
 
     # Check file size to determine strategy
     file_size_gb = os.path.getsize(input_path) / (1024**3)
@@ -138,6 +139,8 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
     working_dir = os.path.dirname(os.path.abspath(output_path))
     temp_db_path = os.path.join(working_dir, f"{os.path.basename(output_path)}.duckdb_temp")
     fifo_path = os.path.join(tempfile.gettempdir(), f"duckdb_fifo_{os.getpid()}")
+    zstd_proc = None
+    zstd_error: BaseException | None = None
 
     if os.path.exists(temp_db_path):
         os.remove(temp_db_path)
@@ -145,11 +148,26 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
         os.remove(fifo_path)
     os.mkfifo(fifo_path)
 
-    try:
-        # Start zstd with high-memory support
-        zstd_cmd = f'"{ZSTD_PATH}" -dcf --long={ZSTD_LONG_RANGE_BITS} "{input_path}" > "{fifo_path}"'
+    def run_zstd_writer():
+        nonlocal zstd_proc, zstd_error
+        try:
+            with open(fifo_path, "wb", buffering=0) as fifo_writer:
+                zstd_proc = subprocess.Popen(
+                    [ZSTD_PATH, "-dcf", f"--long={ZSTD_LONG_RANGE_BITS}", input_path],
+                    stdout=fifo_writer,
+                )
+                zstd_proc.wait()
+                if zstd_proc.returncode != 0:
+                    zstd_error = RuntimeError(f"zstd exited with status {zstd_proc.returncode}")
+        except Exception as e:
+            zstd_error = e
 
-        zstd_proc = subprocess.Popen(zstd_cmd, shell=True)
+    zstd_thread = threading.Thread(target=run_zstd_writer, daemon=True)
+
+    try:
+        # Start zstd in a background writer so opening the FIFO cannot deadlock
+        # before DuckDB opens the read side.
+        zstd_thread.start()
 
         # Use an in-memory connection for the conversion
         con = duckdb.connect(":memory:")
@@ -187,7 +205,9 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
                 ) TO '{scratch_parquet}' (FORMAT 'parquet');
             """)
 
-        zstd_proc.wait()
+        zstd_thread.join()
+        if zstd_error is not None:
+            raise zstd_error
 
         # Phase 2: Sort from Parquet to Parquet
         # DuckDB's Parquet-to-Parquet sorting is the gold standard for Out-of-Core performance.
@@ -208,8 +228,6 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
         if os.path.exists(scratch_parquet):
             os.remove(scratch_parquet)
 
-        zstd_proc.wait()
-
         con.close()
 
         # Generate Manifest
@@ -217,6 +235,10 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
         _generate_parquet_manifest(output_path, manifest_path)
 
     finally:
+        if zstd_proc is not None and zstd_proc.poll() is None:
+            zstd_proc.terminate()
+        if zstd_thread.is_alive():
+            zstd_thread.join(timeout=5)
         if os.path.exists(fifo_path):
             os.remove(fifo_path)
         if os.path.exists(temp_db_path):

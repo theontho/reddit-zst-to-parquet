@@ -20,6 +20,9 @@ def run_benchmark(zst_file: str, temp_dir_base: str, label: str) -> dict[str, An
 
     # Setup
     config.CONVERSION_TEMP_BASE_DIR = temp_dir_base
+    if os.path.abspath(temp_dir_base) in {"/", os.path.expanduser("~")}:
+        logging.error(f"Refusing to remove unsafe benchmark temp directory: {temp_dir_base}")
+        return None
     if os.path.exists(temp_dir_base):
         shutil.rmtree(temp_dir_base)
     os.makedirs(temp_dir_base, exist_ok=True)
