@@ -6,13 +6,22 @@ import sys
 
 from commands.bench import _format_benchmark_summary
 from commands.config_cmd import _format_value
-from commands.manifests import _build_manifest, _build_manifest_from_parquet_file, _list_remote_files_for_manifests
+from commands.manifests import (
+    _build_full_manifest,
+    _build_manifest,
+    _build_manifest_from_parquet_file,
+    _list_remote_files_for_manifests,
+    run_generate_manifests,
+)
 from commands.precheck import apply_method_override, create_transfer_handler
 from commands.verify import (
     _columns_from_manifest,
     _columns_from_parquet_tail,
+    _compare_manifest_schema_to_parquet,
     _compare_manifest_to_parquet,
+    _schema_from_manifest,
     _verify_columns,
+    run_verification,
 )
 from core import config
 from core.parquet_footer import parquet_file_from_tail
@@ -34,6 +43,17 @@ def test_apply_method_override_updates_loaded_config(monkeypatch):
 
     assert config.TRANSFER_METHOD == "local"
     assert config.config_data["transfer"]["method"] == "local"
+
+
+def test_negative_limits_do_not_mutate_config():
+    original_method = config.TRANSFER_METHOD
+    original_config_method = config.config_data["transfer"]["method"]
+
+    assert run_verification(limit=-1) == 1
+    assert run_generate_manifests(limit=-1) == 1
+
+    assert original_method == config.TRANSFER_METHOD
+    assert original_config_method == config.config_data["transfer"]["method"]
 
 
 def test_create_local_transfer_handler(tmp_path, monkeypatch):
@@ -96,6 +116,13 @@ def test_verify_reads_columns_from_supported_manifest_shapes():
     assert _columns_from_manifest({"column_stats": {"a": {}, "extra_json": {}}}) == {"a", "extra_json"}
 
 
+def test_verify_reads_schema_from_manifest():
+    assert _schema_from_manifest({"schema": {"a": "int64", "extra_json": "string"}}) == {
+        "a": "int64",
+        "extra_json": "string",
+    }
+
+
 def test_verify_columns_reports_schema_mismatch():
     errors = _verify_columns({"a", "unexpected"}, {"a", "b"})
 
@@ -121,6 +148,12 @@ def test_verify_reports_manifest_parquet_mismatch():
 
     assert "Manifest missing Parquet columns: ['parquet_only']" in errors
     assert "Manifest has columns not in Parquet: ['manifest_only']" in errors
+
+
+def test_verify_reports_manifest_parquet_type_mismatch():
+    errors = _compare_manifest_schema_to_parquet({"edited": "bool"}, {"edited": "int64"})
+
+    assert "Manifest type mismatch for edited: manifest=bool, parquet=int64" in errors
 
 
 def test_manifest_listing_keeps_sizes_for_ftp_handler():
@@ -149,6 +182,23 @@ def test_build_manifest_includes_schema_and_columns(tmp_path):
     assert manifest["row_count"] == 1
     assert manifest["columns"] == ["body", "extra_json"]
     assert manifest["schema"] == {"body": "string", "extra_json": "null"}
+
+
+def test_build_full_manifest_includes_column_stats(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    parquet_path = tmp_path / "new-RC_2005-01.parquet"
+    table = pa.table({"body": ["hello", None], "extra_json": [None, None]})
+    pq.write_table(table, parquet_path)
+
+    manifest = _build_full_manifest("new-RC_2005-01.parquet", str(parquet_path))
+
+    assert manifest["row_count"] == 2
+    assert manifest["columns"] == ["body", "extra_json"]
+    assert manifest["schema"] == {"body": "string", "extra_json": "null"}
+    assert manifest["column_stats"]["body"] == {"count": 1, "usage_ratio": 0.5}
+    assert manifest["column_stats"]["extra_json"] == {"count": 0, "usage_ratio": 0.0}
 
 
 def test_build_manifest_from_footer_only_parquet(tmp_path):

@@ -290,9 +290,27 @@ class FtpTransferHandler(TransferHandler):
         self,
     ) -> tuple[list[tuple[str, int]], list[tuple[str, int]], list[tuple[str, int]]]:
         """Returns lists of (filename, size) for ZST, Parquet, and other files."""
-        logging.info(f"Auditing remote directory {REMOTE_DIR} (all sizes) using FTP LIST...")
+        logging.info(f"Auditing remote directory {REMOTE_DIR} (all sizes) using FTP...")
         try:
             ftp = self._get_ftp()
+            try:
+                zst_files_with_sizes = []
+                parquet_files_with_sizes = []
+                other_files_with_sizes = []
+                for name, facts in ftp.mlsd():
+                    if facts.get("type") != "file":
+                        continue
+                    size = int(facts.get("size", "0"))
+                    if name.endswith(".zst"):
+                        zst_files_with_sizes.append((name, size))
+                    elif name.endswith(".parquet"):
+                        parquet_files_with_sizes.append((name, size))
+                    else:
+                        other_files_with_sizes.append((name, size))
+                return zst_files_with_sizes, parquet_files_with_sizes, other_files_with_sizes
+            except Exception:
+                logging.debug("FTP MLSD unavailable for size audit; falling back to LIST.")
+
             lines: list[str] = []
             ftp.retrlines("LIST", lines.append)
             return self._parse_ftp_list_output(lines)

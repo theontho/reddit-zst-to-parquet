@@ -4,12 +4,14 @@ import tempfile
 import time
 from typing import Any
 
+import duckdb
 import pyarrow.parquet as pq
 
 from commands.precheck import create_transfer_handler
 from commands.verify import _download_ftp_tail
 from core import config
 from core.parquet_footer import FOOTER_PROBE_BYTES, MAX_FOOTER_BYTES, footer_length_from_tail, parquet_file_from_tail
+from engines.chunked_engine import quote_sql_string
 from transfer.base_transfer import TransferHandler
 from transfer.ftp_transfer import FtpTransferHandler
 
@@ -30,6 +32,30 @@ def _list_remote_files_for_manifests(
 def _build_manifest(filename: str, local_path: str) -> dict[str, Any]:
     parquet_file = pq.ParquetFile(local_path)
     return _build_manifest_from_parquet_file(filename, os.path.getsize(local_path), parquet_file)
+
+
+def _build_full_manifest(filename: str, local_path: str) -> dict[str, Any]:
+    manifest = _build_manifest(filename, local_path)
+    columns = manifest["columns"]
+    parquet_path_sql = quote_sql_string(local_path)
+
+    with duckdb.connect(":memory:") as con:
+        select_parts = ["COUNT(*) as total_rows"]
+        for column in columns:
+            select_parts.append(f'COUNT("{column}")')
+        stats = con.execute(f"SELECT {', '.join(select_parts)} FROM read_parquet({parquet_path_sql})").fetchone()
+
+    if stats is None:
+        raise ValueError(f"No stats returned for {local_path}")
+
+    total_rows = stats[0]
+    manifest["row_count"] = total_rows
+    manifest["column_stats"] = {}
+    for index, column in enumerate(columns):
+        count = stats[index + 1]
+        usage_ratio = round(count / total_rows, 4) if total_rows > 0 else 0
+        manifest["column_stats"][column] = {"count": count, "usage_ratio": usage_ratio}
+    return manifest
 
 
 def _build_manifest_from_parquet_file(filename: str, file_size: int, parquet_file: pq.ParquetFile) -> dict[str, Any]:
@@ -108,6 +134,10 @@ def run_generate_manifests(
     """
     Generates manifest.json files for remote Parquet files using the selected transfer handler.
     """
+    if limit is not None and limit < 0:
+        print("Error: --limit must be non-negative")
+        return 1
+
     method = config.TRANSFER_METHOD.lower()
     try:
         handler = create_transfer_handler(method)
@@ -135,21 +165,20 @@ def run_generate_manifests(
         parquet_sizes, all_parquet, other_files = _list_remote_files_for_manifests(handler, method)
 
         # Filter for Parquet files
-        parquet_files = sorted(f for f in all_parquet if f.endswith(".parquet"))
+        all_parquet_files = sorted(f for f in all_parquet if f.endswith(".parquet"))
+        parquet_files = [
+            filename for filename in all_parquet_files if force or f"{filename}.manifest.json" not in other_files
+        ]
         if limit is not None:
             parquet_files = parquet_files[:limit]
-        print(f"Found {len(parquet_files)} parquet files.")
+        print(f"Found {len(all_parquet_files)} parquet files ({len(parquet_files)} need manifests).")
 
         generated = 0
-        skipped = 0
+        skipped = len(all_parquet_files) - len(parquet_files) if not force else 0
         failed = 0
 
         for index, filename in enumerate(parquet_files, start=1):
             manifest_name = f"{filename}.manifest.json"
-            if manifest_name in other_files and not force:
-                skipped += 1
-                continue
-
             print(f"[{index}/{len(parquet_files)}] Generating manifest for {filename}...")
             try:
                 if method == "ftp" and isinstance(handler, FtpTransferHandler) and not full:
@@ -160,7 +189,9 @@ def run_generate_manifests(
                         success, _ = handler.download_file(filename, tmp.name, expected_size=expected_size)
                         if not success:
                             raise RuntimeError(f"Failed to download {filename} for manifest generation.")
-                        manifest = _build_manifest(filename, tmp.name)
+                        manifest = (
+                            _build_full_manifest(filename, tmp.name) if full else _build_manifest(filename, tmp.name)
+                        )
 
                 if _upload_manifest(handler, manifest_name, manifest):
                     print(f"  Uploaded {manifest_name}")

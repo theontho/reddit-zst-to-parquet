@@ -11,6 +11,7 @@ from core import config
 from core.parquet_footer import FOOTER_PROBE_BYTES, MAX_FOOTER_BYTES, footer_length_from_tail, parquet_file_from_tail
 from transfer.base_transfer import TransferHandler
 from transfer.ftp_transfer import FtpTransferHandler
+from transfer.local_transfer import LocalTransferHandler
 
 FTP_VERIFY_DELAY_SECONDS = 2.0
 FTP_FOOTER_RETRIES = 1
@@ -25,23 +26,27 @@ def _load_master_schemas() -> tuple[set[str], set[str]]:
     return master_rc, master_rs
 
 
-def _columns_from_manifest(data: dict[str, Any]) -> set[str]:
+def _schema_from_manifest(data: dict[str, Any]) -> dict[str, str]:
     schema = data.get("schema")
     if isinstance(schema, dict):
-        return set(schema)
+        return {str(column): str(data_type) for column, data_type in schema.items()}
 
     columns = data.get("columns")
     if isinstance(columns, list):
-        return {str(column) for column in columns}
+        return {str(column): "" for column in columns}
 
     column_stats = data.get("column_stats")
     if isinstance(column_stats, dict):
-        return set(column_stats)
+        return {str(column): "" for column in column_stats}
 
-    return set()
+    return {}
 
 
-def _download_manifest_columns(handler: TransferHandler, manifest_name: str) -> set[str]:
+def _columns_from_manifest(data: dict[str, Any]) -> set[str]:
+    return set(_schema_from_manifest(data))
+
+
+def _download_manifest_schema(handler: TransferHandler, manifest_name: str) -> dict[str, str]:
     content = handler.download_to_string(manifest_name)
     if not content:
         raise ValueError("manifest is empty or could not be downloaded")
@@ -50,10 +55,18 @@ def _download_manifest_columns(handler: TransferHandler, manifest_name: str) -> 
     if not isinstance(data, dict):
         raise ValueError("manifest root is not a JSON object")
 
-    columns = _columns_from_manifest(data)
-    if not columns:
+    schema = _schema_from_manifest(data)
+    if not schema:
         raise ValueError("manifest does not contain schema, columns, or column_stats")
-    return columns
+    return schema
+
+
+def _download_manifest_columns(handler: TransferHandler, manifest_name: str) -> set[str]:
+    return set(_download_manifest_schema(handler, manifest_name))
+
+
+def _schema_from_parquet_file(parquet_file: pq.ParquetFile) -> dict[str, str]:
+    return {field.name: str(field.type) for field in parquet_file.schema_arrow}
 
 
 def _download_ftp_tail(handler: FtpTransferHandler, filename: str, file_size: int, byte_count: int) -> bytes:
@@ -84,17 +97,24 @@ def _columns_from_parquet_tail(tail_bytes: bytes) -> set[str] | None:
     return set(parquet_file.schema_arrow.names)
 
 
-def _download_ftp_parquet_columns(
+def _schema_from_parquet_tail(tail_bytes: bytes) -> dict[str, str] | None:
+    parquet_file = parquet_file_from_tail(tail_bytes)
+    if parquet_file is None:
+        return None
+    return _schema_from_parquet_file(parquet_file)
+
+
+def _download_ftp_parquet_schema(
     handler: FtpTransferHandler,
     filename: str,
     file_size: int,
     probe_bytes: int = FOOTER_PROBE_BYTES,
     max_footer_bytes: int = MAX_FOOTER_BYTES,
-) -> set[str]:
+) -> dict[str, str]:
     tail = _download_ftp_tail(handler, filename, file_size, min(file_size, probe_bytes))
-    columns = _columns_from_parquet_tail(tail)
-    if columns is not None:
-        return columns
+    schema = _schema_from_parquet_tail(tail)
+    if schema is not None:
+        return schema
 
     footer_length = footer_length_from_tail(tail)
     required_bytes = footer_length + 8
@@ -106,27 +126,28 @@ def _download_ftp_parquet_columns(
         raise ValueError(f"Parquet footer length {footer_length} exceeds file size {file_size}")
 
     full_footer = _download_ftp_tail(handler, filename, file_size, required_bytes)
-    columns = _columns_from_parquet_tail(full_footer)
-    if columns is None:
+    schema = _schema_from_parquet_tail(full_footer)
+    if schema is None:
         raise ValueError("Downloaded Parquet footer is incomplete")
-    return columns
+    return schema
 
 
-def _load_real_parquet_columns(
+def _load_real_parquet_schema(
     handler: TransferHandler,
     method: str,
     filename: str,
     parquet_sizes: dict[str, int],
-) -> set[str] | None:
+) -> dict[str, str] | None:
     if method == "ftp":
         if not isinstance(handler, FtpTransferHandler):
             raise TypeError("FTP verification requires FtpTransferHandler")
-        return _download_ftp_parquet_columns(handler, filename, parquet_sizes.get(filename, 0))
+        return _download_ftp_parquet_schema(handler, filename, parquet_sizes.get(filename, 0))
 
     if method == "local":
-        f_path = os.path.join(config.REMOTE_DIR, filename)
-        parquet_file = pq.ParquetFile(f_path)
-        return set(parquet_file.schema_arrow.names)
+        if not isinstance(handler, LocalTransferHandler):
+            raise TypeError("Local verification requires LocalTransferHandler")
+        parquet_file = pq.ParquetFile(handler._resolve_path(filename))
+        return _schema_from_parquet_file(parquet_file)
 
     return None
 
@@ -156,6 +177,16 @@ def _compare_manifest_to_parquet(manifest_columns: set[str], parquet_columns: se
     return errors
 
 
+def _compare_manifest_schema_to_parquet(manifest_schema: dict[str, str], parquet_schema: dict[str, str]) -> list[str]:
+    errors = _compare_manifest_to_parquet(set(manifest_schema), set(parquet_schema))
+    for column in sorted(set(manifest_schema).intersection(parquet_schema)):
+        manifest_type = manifest_schema[column]
+        parquet_type = parquet_schema[column]
+        if manifest_type and parquet_type and manifest_type != parquet_type:
+            errors.append(f"Manifest type mismatch for {column}: manifest={manifest_type}, parquet={parquet_type}")
+    return errors
+
+
 def _list_remote_files_for_verify(handler: TransferHandler, method: str) -> tuple[dict[str, int], set[str], set[str]]:
     if method == "ftp" and isinstance(handler, FtpTransferHandler):
         _zst_files, parquet_files, other_files = handler.list_remote_files_with_all_sizes()
@@ -167,6 +198,13 @@ def _list_remote_files_for_verify(handler: TransferHandler, method: str) -> tupl
 
 def run_verification(limit: int | None = None, delay_seconds: float | None = None, offset: int = 0) -> int:
     """Verifies that the remote Parquet files match the master schemas."""
+    if limit is not None and limit < 0:
+        print("Error: --limit must be non-negative")
+        return 1
+    if offset < 0:
+        print("Error: --offset must be non-negative")
+        return 1
+
     method = config.TRANSFER_METHOD.lower()
     try:
         handler = create_transfer_handler(method)
@@ -232,10 +270,10 @@ def run_verification(limit: int | None = None, delay_seconds: float | None = Non
                     results["skipped"] += 1
                     continue
 
-                parquet_columns = _load_real_parquet_columns(handler, method, filename, parquet_sizes)
+                parquet_schema = _load_real_parquet_schema(handler, method, filename, parquet_sizes)
                 manifest_name = f"{filename}.manifest.json"
 
-                if parquet_columns is None:
+                if parquet_schema is None:
                     if manifest_name not in other_files:
                         print("FAILED (manifest missing; direct Parquet verification unavailable for this method)")
                         results["failed"] += 1
@@ -243,12 +281,16 @@ def run_verification(limit: int | None = None, delay_seconds: float | None = Non
                     columns = _download_manifest_columns(handler, manifest_name)
                     errors = _verify_columns(columns, master)
                 else:
-                    errors = [f"Parquet schema: {error}" for error in _verify_columns(parquet_columns, master)]
+                    errors = [f"Parquet schema: {error}" for error in _verify_columns(set(parquet_schema), master)]
                     if manifest_name not in other_files:
                         errors.append("Manifest missing")
                     else:
-                        manifest_columns = _download_manifest_columns(handler, manifest_name)
-                        errors.extend(_compare_manifest_to_parquet(manifest_columns, parquet_columns))
+                        manifest_schema = _download_manifest_schema(handler, manifest_name)
+                        errors.extend(_compare_manifest_schema_to_parquet(manifest_schema, parquet_schema))
+
+                    edited_type = parquet_schema.get("edited")
+                    if edited_type and edited_type != "int64":
+                        errors.append(f"Parquet schema: edited must be int64, got {edited_type}")
 
                 if not errors:
                     print("OK")
