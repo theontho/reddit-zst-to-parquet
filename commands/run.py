@@ -132,11 +132,10 @@ def run_conversion_loop(only: str | None = None, force: bool = False):
     files_to_process_with_sizes = get_files_to_process(
         log_data, zst_files_with_sizes, parquet_files, other_files, transfer_handler, machine_meta
     )
-    if only:
-        if force:
-            logger.update_log_entry(log_data, only, "pending")
-            logger.save_log(log_data)
-            logging.warning(f"Force mode enabled for {only}; existing outputs may be replaced.")
+    if only and force:
+        logger.update_log_entry(log_data, only, "pending")
+        logger.save_log(log_data)
+        logging.warning(f"Force mode enabled for {only}; existing outputs may be replaced.")
         files_to_process_with_sizes = zst_files_with_sizes
 
     # Sort by size (ascending - smallest first)

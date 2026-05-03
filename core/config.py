@@ -4,7 +4,10 @@ import os
 import platform
 from typing import Any
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 # --- Default Paths ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

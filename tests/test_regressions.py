@@ -1,3 +1,6 @@
+import copy
+import subprocess
+import sys
 from typing import cast
 
 from commands.run import run_conversion_loop
@@ -181,6 +184,9 @@ def test_get_files_to_process_skips_when_manifest_exists():
 
 
 def test_run_only_reprocesses_completed_file(monkeypatch, tmp_path):
+    test_config = copy.deepcopy(config.config_data)
+    test_config["transfer"]["method"] = "local"
+    monkeypatch.setattr(config, "config_data", test_config)
     monkeypatch.setattr(config, "TRANSFER_METHOD", "local")
     monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
     monkeypatch.setattr(config, "CONVERSION_TEMP_BASE_DIR", str(tmp_path / "temp"))
@@ -227,7 +233,7 @@ def test_process_file_force_replaces_existing_claim(tmp_path, monkeypatch):
             self.claim_exists = True
 
         def file_exists(self, remote_filename):
-            return False
+            return self.claim_exists
 
         def delete_file(self, remote_filename):
             deleted_claims.append(remote_filename)
@@ -253,3 +259,17 @@ def test_process_file_force_replaces_existing_claim(tmp_path, monkeypatch):
 
     assert result == "failed"
     assert deleted_claims == ["RC_2005-01.claim.json"]
+
+
+def test_run_force_without_only_shows_run_usage():
+    result = subprocess.run(
+        [sys.executable, "-m", "core.cli", "run", "--force"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "usage: " in result.stderr
+    assert "run" in result.stderr
+    assert "--only" in result.stderr

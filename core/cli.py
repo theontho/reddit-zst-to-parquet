@@ -68,7 +68,7 @@ def main():
 
     if args.command == "run":
         if args.force and not args.only:
-            parser.error("--force requires --only")
+            run_parser.error("--force requires --only")
         if args.method:
             config.TRANSFER_METHOD = args.method
             config.config_data["transfer"]["method"] = args.method
