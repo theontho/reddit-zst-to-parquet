@@ -1,136 +1,276 @@
+import io
 import json
 import os
+import time
+from typing import Any
 
-import fsspec
 import pyarrow.parquet as pq
 
+from commands.precheck import create_transfer_handler
 from core import config
+from core.parquet_footer import FOOTER_PROBE_BYTES, MAX_FOOTER_BYTES, footer_length_from_tail, parquet_file_from_tail
 from transfer.base_transfer import TransferHandler
 from transfer.ftp_transfer import FtpTransferHandler
-from transfer.local_transfer import LocalTransferHandler
-from transfer.nfs_transfer import NfsTransferHandler
-from transfer.rsync_ssh_transfer import RsyncSshTransferHandler
 
-_FTP_FS = None
+FTP_VERIFY_DELAY_SECONDS = 2.0
+FTP_FOOTER_RETRIES = 1
 
 
-def run_verification():
+def _load_master_schemas() -> tuple[set[str], set[str]]:
+    core_dir = os.path.dirname(os.path.dirname(__file__))
+    with open(os.path.join(core_dir, "core", "master_schema_rc.json")) as f:
+        master_rc = set(json.load(f))
+    with open(os.path.join(core_dir, "core", "master_schema_rs.json")) as f:
+        master_rs = set(json.load(f))
+    return master_rc, master_rs
+
+
+def _columns_from_manifest(data: dict[str, Any]) -> set[str]:
+    schema = data.get("schema")
+    if isinstance(schema, dict):
+        return set(schema)
+
+    columns = data.get("columns")
+    if isinstance(columns, list):
+        return {str(column) for column in columns}
+
+    column_stats = data.get("column_stats")
+    if isinstance(column_stats, dict):
+        return set(column_stats)
+
+    return set()
+
+
+def _download_manifest_columns(handler: TransferHandler, manifest_name: str) -> set[str]:
+    content = handler.download_to_string(manifest_name)
+    if not content:
+        raise ValueError("manifest is empty or could not be downloaded")
+
+    data = json.loads(content)
+    if not isinstance(data, dict):
+        raise ValueError("manifest root is not a JSON object")
+
+    columns = _columns_from_manifest(data)
+    if not columns:
+        raise ValueError("manifest does not contain schema, columns, or column_stats")
+    return columns
+
+
+def _download_ftp_tail(handler: FtpTransferHandler, filename: str, file_size: int, byte_count: int) -> bytes:
+    if file_size <= 0:
+        raise ValueError("remote file size is unknown")
+
+    offset = max(file_size - byte_count, 0)
+    last_error: Exception | None = None
+    for _attempt in range(FTP_FOOTER_RETRIES + 1):
+        buffer = io.BytesIO()
+        try:
+            ftp = handler._get_ftp()
+            ftp.retrbinary(f"RETR {filename}", buffer.write, rest=offset)
+            return buffer.getvalue()
+        except Exception as exc:
+            last_error = exc
+            # A failed RETR can leave the control connection with a pending reply.
+            # Reconnect before retrying or continuing to the next file.
+            handler.close()
+
+    raise last_error or RuntimeError(f"Failed to download FTP tail for {filename}")
+
+
+def _columns_from_parquet_tail(tail_bytes: bytes) -> set[str] | None:
+    parquet_file = parquet_file_from_tail(tail_bytes)
+    if parquet_file is None:
+        return None
+    return set(parquet_file.schema_arrow.names)
+
+
+def _download_ftp_parquet_columns(
+    handler: FtpTransferHandler,
+    filename: str,
+    file_size: int,
+    probe_bytes: int = FOOTER_PROBE_BYTES,
+    max_footer_bytes: int = MAX_FOOTER_BYTES,
+) -> set[str]:
+    tail = _download_ftp_tail(handler, filename, file_size, min(file_size, probe_bytes))
+    columns = _columns_from_parquet_tail(tail)
+    if columns is not None:
+        return columns
+
+    footer_length = footer_length_from_tail(tail)
+    required_bytes = footer_length + 8
+    if required_bytes > max_footer_bytes:
+        raise ValueError(
+            f"Parquet footer is too large for safe FTP verification: {required_bytes} bytes (max {max_footer_bytes})"
+        )
+    if required_bytes > file_size:
+        raise ValueError(f"Parquet footer length {footer_length} exceeds file size {file_size}")
+
+    full_footer = _download_ftp_tail(handler, filename, file_size, required_bytes)
+    columns = _columns_from_parquet_tail(full_footer)
+    if columns is None:
+        raise ValueError("Downloaded Parquet footer is incomplete")
+    return columns
+
+
+def _load_real_parquet_columns(
+    handler: TransferHandler,
+    method: str,
+    filename: str,
+    parquet_sizes: dict[str, int],
+) -> set[str] | None:
+    if method == "ftp":
+        if not isinstance(handler, FtpTransferHandler):
+            raise TypeError("FTP verification requires FtpTransferHandler")
+        return _download_ftp_parquet_columns(handler, filename, parquet_sizes.get(filename, 0))
+
+    if method == "local":
+        f_path = os.path.join(config.REMOTE_DIR, filename)
+        parquet_file = pq.ParquetFile(f_path)
+        return set(parquet_file.schema_arrow.names)
+
+    return None
+
+
+def _verify_columns(columns: set[str], master: set[str]) -> list[str]:
+    errors = []
+    missing = master - columns
+    extra = columns - master - {"extra_json"}
+
+    if missing:
+        errors.append(f"Missing columns: {sorted(missing)}")
+    if extra:
+        errors.append(f"Unexpected extra columns: {sorted(extra)}")
+    if "extra_json" not in columns:
+        errors.append("extra_json column MISSING")
+    return errors
+
+
+def _compare_manifest_to_parquet(manifest_columns: set[str], parquet_columns: set[str]) -> list[str]:
+    errors = []
+    missing_from_manifest = parquet_columns - manifest_columns
+    extra_in_manifest = manifest_columns - parquet_columns
+    if missing_from_manifest:
+        errors.append(f"Manifest missing Parquet columns: {sorted(missing_from_manifest)}")
+    if extra_in_manifest:
+        errors.append(f"Manifest has columns not in Parquet: {sorted(extra_in_manifest)}")
+    return errors
+
+
+def _list_remote_files_for_verify(handler: TransferHandler, method: str) -> tuple[dict[str, int], set[str], set[str]]:
+    if method == "ftp" and isinstance(handler, FtpTransferHandler):
+        _zst_files, parquet_files, other_files = handler.list_remote_files_with_all_sizes()
+        return dict(parquet_files), {name for name, _size in parquet_files}, {name for name, _size in other_files}
+
+    _zst_files, parquet_names, other_names = handler.list_remote_files()
+    return {}, parquet_names, other_names
+
+
+def run_verification(limit: int | None = None, delay_seconds: float | None = None, offset: int = 0) -> int:
     """Verifies that the remote Parquet files match the master schemas."""
     method = config.TRANSFER_METHOD.lower()
-    handler: TransferHandler
-    if method == "ftp":
-        handler = FtpTransferHandler()
-    elif method == "rsync":
-        handler = RsyncSshTransferHandler()
-    elif method == "nfs":
-        handler = NfsTransferHandler()
-    elif method == "local":
-        handler = LocalTransferHandler()
-    else:
+    try:
+        handler = create_transfer_handler(method)
+    except ValueError:
         print(f"Error: Unsupported transfer method for verification: {method}")
-        return
+        return 1
+
+    if delay_seconds is None:
+        delay_seconds = FTP_VERIFY_DELAY_SECONDS if method == "ftp" else 0.0
 
     print(f"Connecting via {method.upper()}...")
+    if method == "ftp":
+        print(
+            "FTP safety: verifying actual Parquet footer schemas plus manifest JSON; "
+            f"delay between files: {delay_seconds:.1f}s."
+        )
 
     try:
-        _, all_parquet, _ = handler.list_remote_files()
+        parquet_sizes, all_parquet, other_files = _list_remote_files_for_verify(handler, method)
     except Exception as e:
         print(f"Error listing remote directory: {e}")
-        return
+        handler.close()
+        return 1
 
-    parquet_files = [f for f in all_parquet if f.startswith("new-")]
+    parquet_files = sorted(f for f in all_parquet if f.startswith("new-"))
+    if offset > 0:
+        parquet_files = parquet_files[offset:]
+    if limit is not None:
+        parquet_files = parquet_files[:limit]
 
     if not parquet_files:
         print("No new-*.parquet files found.")
-        return
+        handler.close()
+        return 0
 
     print(f"Found {len(parquet_files)} files to verify.")
 
-    # Load master schemas
-    core_dir = os.path.dirname(os.path.dirname(__file__))
     try:
-        with open(os.path.join(core_dir, "core", "master_schema_rc.json")) as f:
-            master_rc = set(json.load(f))
-        with open(os.path.join(core_dir, "core", "master_schema_rs.json")) as f:
-            master_rs = set(json.load(f))
+        master_rc, master_rs = _load_master_schemas()
     except Exception as e:
         print(f"Error loading master schemas: {e}")
-        return
+        handler.close()
+        return 1
 
-    results = {"total": 0, "ok": 0, "failed": 0}
+    results = {"total": 0, "ok": 0, "failed": 0, "skipped": 0}
 
-    for filename in sorted(parquet_files):
-        results["total"] += 1
-        print(
-            f"[{results['total']}/{len(parquet_files)}] Verifying {filename}...",
-            end=" ",
-            flush=True,
-        )
+    try:
+        for filename in parquet_files:
+            results["total"] += 1
+            print(
+                f"[{results['total']}/{len(parquet_files)}] Verifying {filename}...",
+                end=" ",
+                flush=True,
+            )
 
-        try:
-            if "RC_" in filename:
-                master = master_rc
-            elif "RS_" in filename:
-                master = master_rs
-            else:
-                print("SKIPPED (Unknown type)")
-                continue
+            try:
+                if "RC_" in filename:
+                    master = master_rc
+                elif "RS_" in filename:
+                    master = master_rs
+                else:
+                    print("SKIPPED (Unknown type)")
+                    results["skipped"] += 1
+                    continue
 
-            # This is a bit complex for non-FTP methods, but let's assume FTP for now as per original script
-            # or implement a generic 'open_remote' in handlers if we want it truly modular.
-            # For now, we'll keep the FTP-centric verification or use local if method is local.
+                parquet_columns = _load_real_parquet_columns(handler, method, filename, parquet_sizes)
+                manifest_name = f"{filename}.manifest.json"
 
-            if method == "ftp":
-                global _FTP_FS
-                if _FTP_FS is None:
-                    _FTP_FS = fsspec.filesystem(
-                        "ftp",
-                        host=config.FTP_HOST,
-                        user=config.FTP_USER,
-                        password=config.FTP_PASSWORD,
-                        port=config.FTP_PORT,
-                        timeout=config.FTP_TIMEOUT_SECONDS,
-                    )
+                if parquet_columns is None:
+                    if manifest_name not in other_files:
+                        print("FAILED (manifest missing; direct Parquet verification unavailable for this method)")
+                        results["failed"] += 1
+                        continue
+                    columns = _download_manifest_columns(handler, manifest_name)
+                    errors = _verify_columns(columns, master)
+                else:
+                    errors = [f"Parquet schema: {error}" for error in _verify_columns(parquet_columns, master)]
+                    if manifest_name not in other_files:
+                        errors.append("Manifest missing")
+                    else:
+                        manifest_columns = _download_manifest_columns(handler, manifest_name)
+                        errors.extend(_compare_manifest_to_parquet(manifest_columns, parquet_columns))
 
-                f_path = os.path.join(config.REMOTE_DIR, filename)
-                if not f_path.startswith("/"):
-                    f_path = "/" + f_path
+                if not errors:
+                    print("OK")
+                    results["ok"] += 1
+                else:
+                    print("FAILED")
+                    for error in errors:
+                        print(f"    {error}")
+                    results["failed"] += 1
 
-                # Use a block cache to prevent multiple small FTP RETR commands
-                # for metadata reads, which overloads the server.
-                with _FTP_FS.open(f_path, "rb", cache_type="readahead") as f:
-                    parquet_file = pq.ParquetFile(f)
-                    columns = set(parquet_file.schema_arrow.names)
-            elif method == "local":
-                f_path = os.path.join(config.REMOTE_DIR, filename)
-                parquet_file = pq.ParquetFile(f_path)
-                columns = set(parquet_file.schema_arrow.names)
-            else:
-                print("SKIPPED (Verification only implemented for FTP and Local currently)")
-                continue
-
-            # Check columns
-            missing = master - columns
-            extra = columns - master - {"extra_json"}
-
-            if not missing and not extra and "extra_json" in columns:
-                print("✓ OK")
-                results["ok"] += 1
-            else:
-                print("✗ FAILED")
-                if missing:
-                    print(f"    Missing columns: {sorted(missing)}")
-                if extra:
-                    print(f"    Unexpected extra columns: {sorted(extra)}")
-                if "extra_json" not in columns:
-                    print("    extra_json column MISSING")
+            except Exception as e:
+                print(f"ERROR: {e}")
                 results["failed"] += 1
 
-        except Exception as e:
-            print(f"✗ ERROR: {e}")
-            results["failed"] += 1
+            if method == "ftp" and delay_seconds > 0 and results["total"] < len(parquet_files):
+                time.sleep(delay_seconds)
+    finally:
+        handler.close()
 
     print("\n--- Verification Summary ---")
     print(f"Total Files Processed: {results['total']}")
     print(f"Passed: {results['ok']}")
     print(f"Failed: {results['failed']}")
+    print(f"Skipped: {results['skipped']}")
+    return 0 if results["failed"] == 0 else 1
