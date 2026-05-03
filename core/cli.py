@@ -44,6 +44,7 @@ def main():
     if args.command == "run":
         if args.method:
             config.TRANSFER_METHOD = args.method
+            config.config_data["transfer"]["method"] = args.method
 
         try:
             run_conversion_loop()

@@ -11,8 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from core import logger  # Use logger module for log functions
-from core.config import CONVERSION_TEMP_BASE_DIR
+from core import config, logger  # Use logger module for log functions
 from core.converter import convert_to_parquet
 from core.utils import cleanup_local_temp, update_terminal_title
 from transfer.base_transfer import TransferHandler
@@ -229,7 +228,8 @@ def process_file(
     }
 
     # Use a persistent temp directory per file under the base temp dir
-    file_temp_dir = os.path.join(CONVERSION_TEMP_BASE_DIR, f"{base_name}.zst_parquet_tmp")
+    conversion_temp_base_dir = temp_dir_used or config.CONVERSION_TEMP_BASE_DIR
+    file_temp_dir = os.path.join(conversion_temp_base_dir, f"{base_name}.zst_parquet_tmp")
     try:
         os.makedirs(file_temp_dir, exist_ok=True)
         logging.debug(f"Ensured persistent temp directory exists: {file_temp_dir}")
@@ -286,9 +286,9 @@ def process_file(
     try:
         with open(local_claim_path, "w", encoding="utf-8") as f:
             json.dump(claim_data, f, indent=2)
-        success_claim, _ = transfer_handler.upload_file(local_claim_path, claim_filename)
+        success_claim, _ = transfer_handler.try_create_claim(local_claim_path, claim_filename)
         if not success_claim:
-            logging.error(f"Failed to upload claim for {zst_filename}. Aborting processing to avoid collisions.")
+            logging.info(f"Failed to create claim for {zst_filename}; it may have been claimed by another worker.")
             return "failed"
     except Exception as e:
         logging.error(f"Error creating/uploading claim for {zst_filename}: {e}")
@@ -510,10 +510,21 @@ def process_file(
                     # Success! Manifest replaces claim.
                     transfer_handler.delete_file(claim_filename)
                 else:
-                    logging.warning(f"Manifest upload failed for {manifest_filename}, but parquet was successful.")
+                    error_msg = f"Manifest upload failed for {manifest_filename}."
+                    logging.error(error_msg)
+                    logger.update_log_entry(log_data, zst_filename, "upload_failed", error=error_msg, perf=perf_metrics)
+                    logger.save_log(log_data)
+                    update_terminal_title(f"{progress_prefix}FAILED: {zst_filename} (Manifest Upload)")
+                    current_status = "upload_failed"
+                    return "failed"
             else:
-                # No manifest? Still successful parquet, but delete claim anyway
-                transfer_handler.delete_file(claim_filename)
+                error_msg = f"Manifest file missing after conversion: {local_manifest_path}."
+                logging.error(error_msg)
+                logger.update_log_entry(log_data, zst_filename, "upload_failed", error=error_msg, perf=perf_metrics)
+                logger.save_log(log_data)
+                update_terminal_title(f"{progress_prefix}FAILED: {zst_filename} (Manifest Missing)")
+                current_status = "upload_failed"
+                return "failed"
             # ------------------------------
 
             logging.info(f"Upload complete for {parquet_filename}.")

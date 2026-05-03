@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import contextlib
 import os
 import sys
 
@@ -14,10 +13,9 @@ except ImportError:
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.types as types
+import zstandard as zstd
 
 from core.schema_parser import build_arrow_schema
-from scripts.fileStreams import getFileJsonStream
-from scripts.utils import FileProgressLog
 
 # Configuration
 BATCH_SIZE = 100_000  # Number of rows per batch/row-group
@@ -141,25 +139,22 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
     schema_json = find_schema_for_file(input_path)
     if not schema_json:
         print(f"Error: Could not find schema for {input_path}. Skipping.")
-        return
+        sys.exit(1)
 
     print(f"Using schema: {schema_json}")
     arrow_schema = build_arrow_schema(schema_json)
     schema_fields = set(arrow_schema.names)
 
-    with open(input_path, "rb") as f:
-        json_stream = getFileJsonStream(input_path, f)
-        progress = FileProgressLog(input_path, f)
-
+    dctx = zstd.ZstdDecompressor(max_window_size=2**31)
+    with open(input_path, "rb") as f, dctx.stream_reader(f) as reader:
+        text_stream = reader.read().decode("utf-8", errors="replace").splitlines()
         writer = None
         batch_data = []
 
-        if json_stream is None:
-            print(f"Error: Could not open stream for {input_path}")
-            return
-
-        for row in json_stream:
-            progress.onRow()
+        for line in text_stream:
+            if not line:
+                continue
+            row = json.loads(line)
             batch_data.append(normalize_row(row, schema_fields, arrow_schema))
 
             if len(batch_data) >= BATCH_SIZE:
@@ -186,7 +181,7 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
         if batch_data:
             table = pa.Table.from_pylist(batch_data, schema=arrow_schema)
             # Try sorting, but fall back if it fails (unlikely with cleaning)
-            with contextlib.suppress(BaseException):
+            try:
                 table = table.sort_by(
                     [
                         ("author", "ascending"),
@@ -194,6 +189,8 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
                         ("created_utc", "ascending"),
                     ]
                 )
+            except Exception:
+                pass
 
             if writer is None:
                 writer = pq.ParquetWriter(output_path, arrow_schema, compression=COMPRESSION)
@@ -206,6 +203,9 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
             # Generate Manifest
             manifest_path = output_path + ".manifest.json"
             _generate_parquet_manifest(output_path, manifest_path)
+        else:
+            print(f"Error: No rows written for {input_path}")
+            sys.exit(1)
 
 
 def _generate_parquet_manifest(parquet_path: str, output_manifest_path: str) -> bool:

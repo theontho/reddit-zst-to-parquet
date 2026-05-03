@@ -1,8 +1,11 @@
 .mypy_cache
 .venv
 .ruff_cache
+.pytest_cache
 __pycache__
+.DS_Store
 .vscode
+dist/
 
 config.local.toml
 conversion_log.json

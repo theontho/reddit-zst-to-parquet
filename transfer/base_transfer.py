@@ -45,6 +45,17 @@ class TransferHandler(ABC):
         """
         pass
 
+    def try_create_claim(self, local_path: str, remote_filename: str) -> tuple[bool, float]:
+        """Creates a claim only if it does not already exist.
+
+        Backends should override this with an atomic create operation when the
+        storage system supports it. The default keeps older handlers working but
+        is not atomic.
+        """
+        if self.file_exists(remote_filename):
+            return False, 0.0
+        return self.upload_file(local_path, remote_filename)
+
     @abstractmethod
     def delete_file(self, remote_filename: str) -> bool:
         """Deletes a file from the remote host."""

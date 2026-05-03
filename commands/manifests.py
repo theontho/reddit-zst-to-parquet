@@ -57,12 +57,11 @@ def run_generate_manifests(force=False):
                     if not success:
                         raise Exception(f"Failed to download {filename} for manifest generation.")
                     parquet_file = pq.ParquetFile(tmp.name)
+                    metadata = parquet_file.metadata
+                    schema = parquet_file.schema_arrow
                     file_size = os.path.getsize(tmp.name)
 
                 # Basic stats
-                metadata = parquet_file.metadata
-                schema = parquet_file.schema_arrow
-
                 manifest = {
                     "filename": filename,
                     "file_size": file_size,

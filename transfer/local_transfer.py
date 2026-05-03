@@ -28,11 +28,13 @@ class LocalTransferHandler(TransferHandler):
         absolute_path = (self.base_dir / clean_relative_path).resolve()
 
         # Security check: ensure the resolved path is within the intended directory
-        if not str(absolute_path).startswith(str(self.base_dir.resolve())):
+        try:
+            absolute_path.relative_to(self.base_dir.resolve())
+        except ValueError:
             raise ValueError(
                 f"Invalid path: '{relative_path}' attempts to access outside the "
                 f"configured directory '{self.base_dir}'."
-            )
+            ) from None
         return absolute_path
 
     def _display_speed(self, start_time: float, end_time: float, file_size_bytes: int) -> None:
@@ -152,6 +154,23 @@ class LocalTransferHandler(TransferHandler):
         except Exception as e:
             logger.error(f"Error moving '{local_path}': {e}")
             return False, 0.0
+
+    def try_create_claim(self, local_path: str, remote_filename: str) -> tuple[bool, float]:
+        """Creates a local claim file atomically using exclusive creation."""
+        source = Path(local_path)
+        dest_path = self._resolve_path(remote_filename)
+        start_time = time.monotonic()
+        try:
+            content = source.read_bytes()
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(dest_path, "xb") as f:
+                f.write(content)
+            return True, time.monotonic() - start_time
+        except FileExistsError:
+            return False, time.monotonic() - start_time
+        except Exception as e:
+            logger.error(f"Error creating claim '{remote_filename}': {e}")
+            return False, time.monotonic() - start_time
 
     def delete_file(self, remote_filename: str) -> bool:
         """Deletes a file in the source directory."""

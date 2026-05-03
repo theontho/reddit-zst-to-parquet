@@ -176,7 +176,7 @@ def cleanup_orphan_temp_dirs(log_data, temp_base_dir):
             status = files_log.get(orig_filename, {}).get("status")
 
             mtime = os.path.getmtime(entry_path)
-            is_old = (time.time() - mtime) > 900  # 15 minutes
+            is_old = (time.time() - mtime) > 24 * 60 * 60
 
             if status not in ["downloading", "converting"] or is_old:
                 logging.info(f"Cleaning up orphan temp directory: {entry} (Status: {status or 'unknown'})")

@@ -17,7 +17,7 @@ The system is designed to be **stateless and distributed**. Multiple worker node
 
 ## Component Breakdown
 
-### 1. The Entry Point (`main.py`)
+### 1. The Entry Point (`core/cli.py`)
 A unified CLI dispatcher using `argparse`. Supported subcommands:
 - `run`: Starts the distributed conversion processing loop.
 - `report`: Audits the archive and generates a fleet performance report.
@@ -38,8 +38,8 @@ The `TransferHandler` base class defines a standard interface for file operation
 - `RsyncSshTransferHandler`: Uses rsync over SSH for high-efficiency delta transfers.
 
 ### 4. Conversion Engines (`engines/`)
-- **Chunked Mode (`chunked.py`)**: Recommended for stability. Processes files in row groups.
-- **Streamed Mode (`streamed.py`)**: High-speed streaming through a unix pipe (Faster but prone to OOM on large files).
+- **Chunked Mode (`chunked_engine.py`)**: Recommended for stability. Processes files in row groups.
+- **Streamed Mode (`streamed_engine.py`)**: High-speed streaming through a unix pipe (Faster but prone to OOM on large files).
 
 ### 5. Fleet Monitoring & The Claim System
 Nodes avoid redundant work via `{filename}.claim.json` files stored on the remote storage. The `report` command audits these claims to:

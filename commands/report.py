@@ -35,12 +35,15 @@ class ManifestDownloader:
             executor.map(self.worker, chunks)
 
     def worker(self, chunk):
+        transfer_handler = self.transfer_handler
+        if isinstance(self.transfer_handler, FtpTransferHandler):
+            transfer_handler = FtpTransferHandler()
         if not chunk:
             return
 
         for name in chunk:
             try:
-                content = self.transfer_handler.download_to_string(name)
+                content = transfer_handler.download_to_string(name)
                 if content:
                     data = json.loads(content)
                     with self.lock:
@@ -55,6 +58,8 @@ class ManifestDownloader:
                         f"   Progress: {self.processed}/{self.total} manifests audited...",
                         end="\r",
                     )
+
+        transfer_handler.close()
 
 
 def run_fleet_report():

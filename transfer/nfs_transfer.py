@@ -32,11 +32,13 @@ class NfsTransferHandler(TransferHandler):
         absolute_path = (self.remote_base_dir / clean_relative_path).resolve()
 
         # Security check: ensure the resolved path is within the intended remote directory
-        if not str(absolute_path).startswith(str(self.remote_base_dir.resolve())):
+        try:
+            absolute_path.relative_to(self.remote_base_dir.resolve())
+        except ValueError:
             raise ValueError(
                 f"Invalid path: '{relative_path}' attempts to access outside the "
                 f"configured remote directory '{self.remote_base_dir}'."
-            )
+            ) from None
         return absolute_path
 
     def _display_speed(self, start_time, end_time, file_size_bytes):
@@ -209,6 +211,23 @@ class NfsTransferHandler(TransferHandler):
         except Exception as e:
             logger.error(f"Error during NFS upload of '{local_path}': {e}", exc_info=True)
             return False, 0.0
+
+    def try_create_claim(self, local_path: str, remote_filename: str) -> tuple[bool, float]:
+        """Creates a claim on NFS using exclusive creation."""
+        local_source = Path(local_path)
+        nfs_dest_path = self._resolve_remote_path(remote_filename)
+        start_time = time.monotonic()
+        try:
+            content = local_source.read_bytes()
+            nfs_dest_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(nfs_dest_path, "xb") as f:
+                f.write(content)
+            return True, time.monotonic() - start_time
+        except FileExistsError:
+            return False, time.monotonic() - start_time
+        except Exception as e:
+            logger.error(f"Error creating NFS claim '{remote_filename}': {e}", exc_info=True)
+            return False, time.monotonic() - start_time
 
     def delete_file(self, remote_filename: str) -> bool:
         """Deletes a file on the NFS mount."""

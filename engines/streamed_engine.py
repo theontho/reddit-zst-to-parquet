@@ -72,7 +72,7 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
     schema_json = find_schema_for_file(input_path)
     if not schema_json:
         print(f"Error: Could not find schema for {input_path}. Skipping.")
-        return
+        sys.exit(1)
 
     # Check file size to determine strategy
     file_size_gb = os.path.getsize(input_path) / (1024**3)
@@ -138,6 +138,8 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
     working_dir = os.path.dirname(os.path.abspath(output_path))
     temp_db_path = os.path.join(working_dir, f"{os.path.basename(output_path)}.duckdb_temp")
     fifo_path = os.path.join(tempfile.gettempdir(), f"duckdb_fifo_{os.getpid()}")
+    fifo_writer = None
+    zstd_proc = None
 
     if os.path.exists(temp_db_path):
         os.remove(temp_db_path)
@@ -146,10 +148,12 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
     os.mkfifo(fifo_path)
 
     try:
-        # Start zstd with high-memory support
-        zstd_cmd = f'"{ZSTD_PATH}" -dcf --long={ZSTD_LONG_RANGE_BITS} "{input_path}" > "{fifo_path}"'
-
-        zstd_proc = subprocess.Popen(zstd_cmd, shell=True)
+        # Start zstd with high-memory support and write directly to the FIFO without a shell.
+        fifo_writer = os.fdopen(os.open(fifo_path, os.O_WRONLY), "wb", buffering=0)
+        zstd_proc = subprocess.Popen(
+            [ZSTD_PATH, "-dcf", f"--long={ZSTD_LONG_RANGE_BITS}", input_path],
+            stdout=fifo_writer,
+        )
 
         # Use an in-memory connection for the conversion
         con = duckdb.connect(":memory:")
@@ -188,6 +192,10 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
             """)
 
         zstd_proc.wait()
+        fifo_writer.close()
+        fifo_writer = None
+        if zstd_proc.returncode != 0:
+            raise RuntimeError(f"zstd exited with status {zstd_proc.returncode}")
 
         # Phase 2: Sort from Parquet to Parquet
         # DuckDB's Parquet-to-Parquet sorting is the gold standard for Out-of-Core performance.
@@ -208,8 +216,6 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
         if os.path.exists(scratch_parquet):
             os.remove(scratch_parquet)
 
-        zstd_proc.wait()
-
         con.close()
 
         # Generate Manifest
@@ -217,6 +223,11 @@ def convert_file(input_path: str, output_path: str | None = None) -> None:
         _generate_parquet_manifest(output_path, manifest_path)
 
     finally:
+        with contextlib.suppress(Exception):
+            if fifo_writer is not None:
+                fifo_writer.close()
+        if zstd_proc is not None and zstd_proc.poll() is None:
+            zstd_proc.terminate()
         if os.path.exists(fifo_path):
             os.remove(fifo_path)
         if os.path.exists(temp_db_path):
