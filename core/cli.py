@@ -54,15 +54,35 @@ def main():
     # 'report' command
     subparsers.add_parser("report", help="Generate a fleet progress and performance report.")
 
-    # 'bench' command (To be implemented)
+    # 'bench' command
     subparsers.add_parser("bench", help="Run storage benchmarks.")
 
-    # 'verify' command (To be implemented)
-    subparsers.add_parser("verify", help="Verify remote Parquet files.")
+    # 'verify' command
+    verify_parser = subparsers.add_parser("verify", help="Verify remote Parquet files.")
+    verify_parser.add_argument("--limit", type=int, help="Verify only the first N files; useful for safe smoke tests.")
+    verify_parser.add_argument("--offset", type=int, default=0, help="Skip the first N sorted files before verifying.")
+    verify_parser.add_argument(
+        "--delay",
+        type=float,
+        help="Seconds to wait between files for FTP safety (default: 2 for FTP, 0 otherwise).",
+    )
 
     # 'manifests' command
     manifests_parser = subparsers.add_parser("manifests", help="Generate missing remote manifests.")
     manifests_parser.add_argument("--force", action="store_true", help="Force regeneration of all manifests.")
+    manifests_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Download and scan full Parquet files instead of footer-only FTP regeneration.",
+    )
+    manifests_parser.add_argument(
+        "--limit", type=int, help="Generate only the first N manifests; useful for safe smoke tests."
+    )
+    manifests_parser.add_argument(
+        "--delay",
+        type=float,
+        help="Seconds to wait between files for FTP safety (default: 5 for FTP, 0 otherwise).",
+    )
 
     args = parser.parse_args()
 
@@ -103,12 +123,12 @@ def main():
     elif args.command == "verify":
         from commands.verify import run_verification
 
-        run_verification()
+        sys.exit(run_verification(limit=args.limit, delay_seconds=args.delay, offset=args.offset))
 
     elif args.command == "manifests":
         from commands.manifests import run_generate_manifests
 
-        run_generate_manifests(force=args.force)
+        sys.exit(run_generate_manifests(force=args.force, limit=args.limit, delay_seconds=args.delay, full=args.full))
 
     else:
         parser.print_help()

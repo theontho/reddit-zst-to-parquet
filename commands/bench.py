@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from core import config
@@ -12,6 +13,82 @@ from transfer.ftp_transfer import FtpTransferHandler
 from transfer.local_transfer import LocalTransferHandler
 from transfer.nfs_transfer import NfsTransferHandler
 from transfer.rsync_ssh_transfer import RsyncSshTransferHandler
+
+STAGE_ORDER = ("download", "conversion", "upload")
+
+
+def _format_seconds(value: Any) -> str:
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return "N/A"
+
+    return f"{seconds:.2f}s"
+
+
+def _format_speed_mb_s(stage_data: dict[str, Any]) -> str:
+    if "speed_mb_s" not in stage_data:
+        return "-"
+
+    try:
+        speed = float(stage_data["speed_mb_s"])
+    except (TypeError, ValueError):
+        return "N/A"
+
+    return f"{speed:.2f} MB/s"
+
+
+def _format_table(headers: tuple[str, ...], rows: Sequence[tuple[str, ...]]) -> str:
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, value in enumerate(row):
+            widths[index] = max(widths[index], len(value))
+
+    border = "+-" + "-+-".join("-" * width for width in widths) + "-+"
+    lines = [
+        border,
+        "| " + " | ".join(header.ljust(widths[index]) for index, header in enumerate(headers)) + " |",
+        border,
+    ]
+    for row in rows:
+        lines.append("| " + " | ".join(value.ljust(widths[index]) for index, value in enumerate(row)) + " |")
+    lines.append(border)
+    return "\n".join(lines)
+
+
+def _format_benchmark_summary(test_file: str, results: list[dict[str, Any]]) -> str:
+    lines = ["", "=" * 70, "BENCHMARK RESULTS", "=" * 70, f"Input file: {test_file}"]
+
+    if not results:
+        lines.extend(["", "No benchmark completed successfully.", "=" * 70])
+        return "\n".join(lines)
+
+    for result in results:
+        stages = result.get("stages", {})
+        stage_names = [stage for stage in STAGE_ORDER if stage in stages]
+        stage_names.extend(sorted(stage for stage in stages if stage not in STAGE_ORDER))
+
+        rows = [
+            (
+                stage.replace("_", " ").title(),
+                _format_seconds(stages[stage].get("duration_sec")),
+                _format_speed_mb_s(stages[stage]),
+            )
+            for stage in stage_names
+        ]
+        rows.append(("Total", _format_seconds(result.get("total_duration")), "-"))
+
+        lines.extend(
+            [
+                "",
+                f"Target:    {result.get('label', 'Unknown')}",
+                f"Temp path: {result.get('temp_path', 'Unknown')}",
+                _format_table(("Stage", "Duration", "Throughput"), rows),
+            ]
+        )
+
+    lines.append("=" * 70)
+    return "\n".join(lines)
 
 
 def run_benchmark(zst_file: str, temp_dir_base: str, label: str) -> dict[str, Any] | None:
@@ -94,13 +171,9 @@ def run_storage_benchmark():
     print(f"STORAGE PERFORMANCE BENCHMARK: {test_file}")
     print("=" * 70)
 
+    results = []
     res_ssd = run_benchmark(test_file, ssd_path, "Local Temp Directory")
-
     if res_ssd:
-        print(f"\nResults for: {res_ssd['label']}")
-        print(f"  Total Transaction Time: {res_ssd['total_duration']}s")
-        for stage, data in res_ssd["stages"].items():
-            speed = f" ({data['speed_mb_s']} MB/s)" if "speed_mb_s" in data else ""
-            print(f"    - {stage.capitalize():<10}: {data['duration_sec']:>8}s{speed}")
+        results.append(res_ssd)
 
-    print("\n" + "=" * 70)
+    print(_format_benchmark_summary(test_file, results))
