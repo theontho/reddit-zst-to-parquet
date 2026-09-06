@@ -14,10 +14,10 @@ This document captures the technical challenges and architectural decisions made
 
 ## 3. High-Performance Engine Tuning (DuckDB)
 *   **Single-Thread vs. Multi-Thread**: While DuckDB can parse JSON in parallel, modern Reddit archives (2018+) are so rich that multi-threaded parsing exhausts RAM (32GB+) before disk-spilling can trigger.
-*   **The "Ultra-Stable" Pattern**: For archives >5GB, we forced `threads=1` and `memory_limit='8GB'`. This slightly reduces speed but guarantees stability by forcing DuckDB's internal external-sorter to use the disk (external Volume) instead of RAM.
+*   **Resource-Aware Merge Pattern**: Use the configured DuckDB thread and memory limits, and place spill files explicitly beside the output on fast local storage. Forcing every large merge to one thread can turn the final global sort into a multi-hour bottleneck.
 *   **FIFO Pipe vs. Native Decoder**: DuckDB's native ZSTD decoder crashed on frames using "long-range" compression (`--long`). We switched to a **Named Pipe (FIFO)** approach, using the system `zstd` binary for decompression, which handled every frame correctly.
 *   **Pre-Sorting Chunks for Sort-Efficiency**: When converting massive (>100GB uncompressed) files, the final global `ORDER BY` during the merge step can exceed 250GB of temporary disk space (spill). By sorting each individual chunk during creation, the final merge becomes a more efficient merge-sort of already sorted streams, drastically reducing temporary disk usage.
-*   **Large-Scale Merge Stability**: For merges involving >5 chunks, forcing `threads=1` and `memory_limit='16GB'` prevents resource exhaustion and ensures the sorter handles the data predictably without crashing the OS or hitting `max_temp_directory_size`.
+*   **Large-Scale Merge Stability**: Bound DuckDB memory and temporary storage explicitly while retaining parallel execution. Keep source chunks, output, and spill files on the fastest local disk, and preserve the chunks until row-count verification succeeds.
 
 ## 4. Operational Resilience
 *   **Transactional State Machine**: A simple "Completed" list is insufficient for TB-scale work. We implemented a 7-stage state machine (`pending` -> `downloading` -> `downloaded` -> `converting` -> `converted` -> `uploading` -> `completed`) recorded in an atomic JSON log.

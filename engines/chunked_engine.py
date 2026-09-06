@@ -367,23 +367,18 @@ def merge_and_verify_parquet(
     logging.debug(f"--- Running Standardized Merge (Master Schema: {'Yes' if master_columns else 'No'}) ---")
     try:
         with duckdb.connect(":memory:") as con:
-            # --- Ultra-Stable Merge Configuration ---
-            # For large merges (many chunks), we force threads=1 to minimize disk spill overhead
-            # and ensure stability. We also cap memory to avoid OOM before spilling starts.
             merge_threads = DUCKDB_THREADS
             merge_memory = DUCKDB_MEMORY_LIMIT_GB
-
-            if len(input_files) > 5:
-                logging.info(
-                    f"Large merge detected ({len(input_files)} chunks). "
-                    "Enabling Ultra-Stable mode: threads=1, memory_limit=16GB."
-                )
-                merge_threads = 1
-                merge_memory = min(merge_memory, 16)  # Cap at 16GB for stability
+            merge_temp_dir = os.path.abspath(f"{output_path}.duckdb_tmp")
+            os.makedirs(merge_temp_dir, exist_ok=True)
+            logging.info(
+                f"Merging {len(input_files)} chunks with DuckDB: "
+                f"threads={merge_threads}, memory_limit={merge_memory}GB, temp_directory={merge_temp_dir}"
+            )
 
             con.execute(f"SET threads={merge_threads};")
             con.execute(f"SET memory_limit='{merge_memory}GB';")
-            # Increase max temp size to avoid conservative defaults on some systems
+            con.execute(f"SET temp_directory={quote_sql_string(merge_temp_dir)};")
             con.execute("SET max_temp_directory_size='1TB';")
             con.execute(f"SET preserve_insertion_order={'true' if DUCKDB_PRESERVE_INSERTION_ORDER else 'false'};")
 
