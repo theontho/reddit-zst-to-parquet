@@ -1084,7 +1084,9 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         # Reset chunk_num to the actual starting chunk number for the loop
         chunk_num = start_chunk_num - 1  # Will be incremented to start_chunk_num at loop start
 
-        if args.skip_chunk_sort:
+        if not args.no_merge:
+            logging.info("Chunk files will remain unsorted because the final merge performs the global sort.")
+        elif args.skip_chunk_sort:
             logging.info("Chunk sorting disabled for maximum unsorted-dataset throughput.")
 
         # --- Chunk Processing Loop ---
@@ -1487,7 +1489,9 @@ def _process_chunk(
                 # Build the final COPY command
                 temp_parquet_filename_sql = quote_sql_string(temp_parquet_filename)
                 chunk_order_clause = (
-                    "" if args.skip_chunk_sort else "ORDER BY author ASC, subreddit ASC, created_utc ASC"
+                    "ORDER BY author ASC, subreddit ASC, created_utc ASC"
+                    if args.no_merge and not args.skip_chunk_sort
+                    else ""
                 )
                 duckdb_query = f"""
                 COPY (
