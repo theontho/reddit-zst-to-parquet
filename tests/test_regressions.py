@@ -68,6 +68,25 @@ def test_chunked_engine_accepts_merge_resource_overrides(tmp_path, monkeypatch):
     assert args.merge_memory_limit_gb == 25
 
 
+def test_chunked_engine_rejects_unsorted_chunks_with_final_merge(tmp_path, monkeypatch, capsys):
+    input_path = tmp_path / "RC_2026-05.zst"
+    input_path.write_bytes(b"zstd fixture")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["chunked_engine.py", str(input_path), "--skip-chunk-sort"],
+    )
+
+    try:
+        parse_arguments()
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected unsafe unsorted global merge to be rejected")
+
+    assert "--skip-chunk-sort requires --no-merge" in capsys.readouterr().err
+
+
 def test_local_transfer_rejects_sibling_prefix_path(tmp_path, monkeypatch):
     base = tmp_path / "base"
     base.mkdir()
