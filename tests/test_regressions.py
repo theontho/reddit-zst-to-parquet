@@ -1,13 +1,17 @@
 import copy
+import io
 import subprocess
 import sys
 from typing import cast
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from commands.run import run_conversion_loop
 from core import config
 from core.converter import convert_to_parquet
 from core.processor import get_files_to_process, process_file
-from engines.chunked_engine import load_master_schema
+from engines.chunked_engine import _parquet_metadata_row_count, _write_jsonl_chunk, load_master_schema
 from transfer.base_transfer import TransferHandler
 from transfer.ftp_transfer import FtpTransferHandler
 from transfer.local_transfer import LocalTransferHandler
@@ -16,6 +20,24 @@ from transfer.local_transfer import LocalTransferHandler
 def test_chunked_engine_loads_packaged_master_schema():
     assert load_master_schema("RC_2024-01.zst")
     assert load_master_schema("RS_2024-01.zst")
+
+
+def test_write_jsonl_chunk_streams_bounded_lines(tmp_path):
+    output_path = tmp_path / "chunk.jsonl"
+    source = io.StringIO('{"id": 1}\n{"id": 2}\n{"id": 3}\n')
+
+    assert _write_jsonl_chunk(source, str(output_path), 2) == 2
+    assert output_path.read_text(encoding="utf-8") == '{"id": 1}\n{"id": 2}\n'
+    assert source.readline() == '{"id": 3}\n'
+
+
+def test_parquet_metadata_row_count_sums_files(tmp_path):
+    first_path = tmp_path / "first.parquet"
+    second_path = tmp_path / "second.parquet"
+    pq.write_table(pa.table({"id": [1, 2]}), first_path)
+    pq.write_table(pa.table({"id": [3, 4, 5]}), second_path)
+
+    assert _parquet_metadata_row_count([str(first_path), str(second_path)]) == 5
 
 
 def test_local_transfer_rejects_sibling_prefix_path(tmp_path, monkeypatch):

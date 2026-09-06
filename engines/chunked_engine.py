@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 from importlib import resources
+from typing import IO
 
 # Add parent directory to path to allow imports from the main package
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -363,9 +364,18 @@ def merge_and_verify_parquet(
     parquet_files_list_str = ", ".join([quote_sql_string(f) for f in input_files])
 
     master_columns = load_master_schema(output_path)
+    merge_temp_dir = os.path.abspath(f"{output_path}.duckdb_tmp")
 
     logging.debug(f"--- Running Standardized Merge (Master Schema: {'Yes' if master_columns else 'No'}) ---")
     try:
+        os.makedirs(merge_temp_dir, exist_ok=True)
+        available_temp_bytes = shutil.disk_usage(os.path.dirname(merge_temp_dir)).free
+        max_temp_bytes = int(available_temp_bytes * 0.75)
+        if max_temp_bytes < 1024**3:
+            raise RuntimeError(
+                f"Insufficient free space for DuckDB spill files: {format_size(available_temp_bytes)} available"
+            )
+
         with duckdb.connect(":memory:") as con:
             # --- Ultra-Stable Merge Configuration ---
             # For large merges (many chunks), we force threads=1 to minimize disk spill overhead
@@ -383,9 +393,16 @@ def merge_and_verify_parquet(
 
             con.execute(f"SET threads={merge_threads};")
             con.execute(f"SET memory_limit='{merge_memory}GB';")
-            # Increase max temp size to avoid conservative defaults on some systems
-            con.execute("SET max_temp_directory_size='1TB';")
+            con.execute(f"SET temp_directory={quote_sql_string(merge_temp_dir)};")
+            con.execute(f"SET max_temp_directory_size='{max_temp_bytes}B';")
             con.execute(f"SET preserve_insertion_order={'true' if DUCKDB_PRESERVE_INSERTION_ORDER else 'false'};")
+            logging.info(
+                "DuckDB merge resources: threads=%s, memory_limit=%sGB, temp_directory=%s, max_temp=%s",
+                merge_threads,
+                merge_memory,
+                merge_temp_dir,
+                format_size(max_temp_bytes),
+            )
 
             from core.utils import Heartbeat
 
@@ -437,11 +454,17 @@ def merge_and_verify_parquet(
             with contextlib.suppress(BaseException):
                 os.remove(output_path)
         return False
+    finally:
+        if os.path.isdir(merge_temp_dir):
+            try:
+                os.rmdir(merge_temp_dir)
+            except OSError:
+                logging.info(f"DuckDB spill directory retained for inspection: {merge_temp_dir}")
 
     logging.info(f"Successfully created merged Parquet file: {output_path}")
 
     # --- Verification Steps (Existing Logic) ---
-    merge_verified = _verify_merge_counts(parquet_files_list_str, quoted_output_file, duckdb_path, output_path, verbose)
+    merge_verified = _verify_merge_counts(input_files, output_path)
 
     if merge_verified:
         # --- Generate Final Manifest ---
@@ -504,77 +527,47 @@ def _generate_parquet_manifest(parquet_path: str, duckdb_path: str, output_manif
         return False
 
 
-def _verify_merge_counts(
-    parquet_files_list_str: str,
-    quoted_output_file: str,
-    duckdb_path: str,
-    output_path: str,
-    verbose: bool,
-) -> bool:
-    """Helper function to verify row counts after merging Parquet files."""
+def _parquet_metadata_row_count(parquet_files: list[str]) -> int | None:
+    """Returns the total row count from Parquet footers without scanning column data."""
+    try:
+        import pyarrow.parquet as pq
+
+        return sum(int(pq.ParquetFile(path).metadata.num_rows) for path in parquet_files)
+    except Exception as e:
+        logging.error(f"Failed to read Parquet row-count metadata: {e}")
+        return None
+
+
+def _verify_merge_counts(input_files: list[str], output_path: str) -> bool:
+    """Verifies merged row counts using Parquet footer metadata."""
     logging.info("--- Verifying Row Counts ---")
 
-    # 2. Count rows in input files (using the list)
-    sql_count_input = f"SELECT COUNT(*) FROM read_parquet([{parquet_files_list_str}], union_by_name=True);"
-    duckdb_count_input_command = [duckdb_path, "-c", sql_count_input]
-    input_count_output, input_count_success = run_duckdb_command(
-        duckdb_count_input_command, "count input chunks", verbose=verbose
-    )
-
-    if not input_count_success:
-        logging.error("Failed to execute input row count command. Verification aborted.")
-        return False  # Indicate failure
-
-    input_row_count = parse_duckdb_count(input_count_output)
-
+    input_row_count = _parquet_metadata_row_count(input_files)
     if input_row_count is None:
         logging.error("Could not determine input chunk row count. Verification failed.")
-        return False  # Indicate failure
+        return False
 
-    logging.info(f"Total rows reported by DuckDB for input files: {input_row_count}")
+    logging.info(f"Total rows reported by Parquet metadata for input files: {input_row_count}")
 
-    # 3. Count rows in output file
-    sql_count_output = f"SELECT COUNT(*) FROM read_parquet({quoted_output_file});"
-    duckdb_count_output_command = [duckdb_path, "-c", sql_count_output]
-    output_count_output, output_count_success = run_duckdb_command(
-        duckdb_count_output_command, "count output file", verbose=verbose
-    )
-
-    if not output_count_success:
-        logging.error("Failed to execute output row count command. Verification aborted.")
-        return False  # Indicate failure
-
-    output_row_count = parse_duckdb_count(output_count_output)
-
+    output_row_count = _parquet_metadata_row_count([output_path])
     if output_row_count is None:
         logging.error("Could not determine output row count. Verification failed.")
-        return False  # Indicate failure
+        return False
 
     logging.info(f"Total rows in output file ('{output_path}'): {output_row_count}")
 
-    # 4. Compare counts
     if input_row_count == output_row_count:
         logging.info("\nVerification successful: Row counts match!")
-        return True  # Indicate success
+        return True
 
     logging.error(f"\nVerification FAILED: Row counts do not match! Input={input_row_count}, Output={output_row_count}")
-    return False  # Indicate failure
+    return False
 
 
-def _verify_source_row_count(expected_row_count: int, output_path: str, duckdb_path: str, verbose: bool) -> bool:
-    """Verifies final Parquet row count against the decompressed source line count."""
+def _verify_source_row_count(expected_row_count: int, output_path: str) -> bool:
+    """Verifies final Parquet metadata row count against the decompressed source line count."""
     logging.info("--- Verifying Source Row Count ---")
-    quoted_output_file = quote_sql_string(output_path)
-    sql_count_output = f"SELECT COUNT(*) FROM read_parquet({quoted_output_file});"
-    output_count_output, output_count_success = run_duckdb_command(
-        [duckdb_path, "-c", sql_count_output], "count final output rows", verbose=verbose
-    )
-
-    if not output_count_success:
-        logging.error("Failed to execute final output row count command.")
-        return False
-
-    output_row_count = parse_duckdb_count(output_count_output)
+    output_row_count = _parquet_metadata_row_count([output_path])
     if output_row_count is None:
         logging.error("Could not determine final output row count.")
         return False
@@ -1060,36 +1053,36 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 logging.error(f"\nError skipping lines from zstd stream: {e}")
                 sys.exit(1)
             if line_count < lines_to_skip:
-                logging.warning(
-                    "Warning: Input stream ended before all lines could be skipped. Proceeding, but results may be incomplete."
-                )
+                logging.error("Input stream ended before all resume lines could be skipped.")
+                sys.exit(1)
 
         # Reset chunk_num to the actual starting chunk number for the loop
         chunk_num = start_chunk_num - 1  # Will be incremented to start_chunk_num at loop start
+
+        if not args.no_merge:
+            logging.info("Chunk files will remain unsorted because the final merge performs the global sort.")
 
         # --- Chunk Processing Loop ---
         while True:
             chunk_num += 1
             chunk_start_line = line_count + 1
-            chunk_lines: list[str] = []  # Initialize chunk_lines here
+            temp_jsonl_filename = os.path.join(temp_dir_path, f"chunk_{chunk_num:05d}.jsonl")
 
-            # Read lines for the current chunk
             try:
-                for _ in range(args.chunk_size):
-                    line = zstd_proc.stdout.readline()
-                    if not line:  # End of stream
-                        break
-                    chunk_lines.append(line)
-                    line_count += 1
+                chunk_line_count = _write_jsonl_chunk(
+                    zstd_proc.stdout,
+                    temp_jsonl_filename,
+                    args.chunk_size,
+                )
+                line_count += chunk_line_count
             except Exception as e:
                 logging.error(f"\nError reading from zstd stream during chunk {chunk_num}: {e}")
-                # Check zstd process status
                 if zstd_proc.poll() is not None:
                     logging.error(f"zstd process exited unexpectedly with code {zstd_proc.returncode}.")
-                break  # Exit the loop on read error
+                sys.exit(1)
 
-            if not chunk_lines:  # No more lines read, previous chunk was the last
-                chunk_num -= 1  # Decrement chunk_num as no lines were added
+            if chunk_line_count == 0:
+                chunk_num -= 1
                 logging.info("End of input stream reached.")
                 break
 
@@ -1100,7 +1093,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 args,
                 temp_dir_path,
                 chunk_num,
-                chunk_lines,
+                temp_jsonl_filename,
                 chunk_start_line,
                 chunk_end_line,
                 estimated_decompressed_size,
@@ -1120,11 +1113,6 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 cumulative_bytes_processed += chunk_byte_size_or_none
                 # parquet_chunk_files list is updated inside _process_chunk now
 
-            # Check if the zstd process has exited unexpectedly AFTER reading
-            if zstd_proc.poll() is not None and not chunk_lines:  # Check poll only if readline returned empty last time
-                logging.error(f"zstd process exited with code {zstd_proc.returncode} while reading data.")
-                break
-
             # Check for test run condition
             if args.test_run and chunk_num >= 2:
                 logging.info("Test run: Stopping after 2 chunks.")
@@ -1135,22 +1123,31 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         # Check for zstd errors after processing all output
         if zstd_proc:
             zstd_returncode = zstd_proc.poll()  # Check if already exited
-            if zstd_returncode is None:  # If still running (e.g., test run break)
-                logging.warning("Terminating zstd process...")
+            if zstd_returncode is None and not args.test_run:
+                try:
+                    zstd_returncode = zstd_proc.wait(timeout=ZSTD_TERMINATION_TIMEOUT_SECONDS)
+                except subprocess.TimeoutExpired:
+                    logging.error("zstd did not exit after its output stream ended; terminating the stalled process.")
+                    zstd_proc.kill()
+                    zstd_proc.wait()
+                    sys.exit(1)
+            elif zstd_returncode is None:
+                logging.warning("Terminating zstd process after test-run limit...")
                 zstd_proc.terminate()
                 try:
-                    zstd_returncode = zstd_proc.wait(timeout=ZSTD_TERMINATION_TIMEOUT_SECONDS)  # Wait briefly
-
+                    zstd_returncode = zstd_proc.wait(timeout=ZSTD_TERMINATION_TIMEOUT_SECONDS)
                 except subprocess.TimeoutExpired:
                     logging.warning(
                         f"Warning: zstd did not terminate gracefully after {ZSTD_TERMINATION_TIMEOUT_SECONDS}s, killing..."
                     )
                     zstd_proc.kill()
-                    zstd_returncode = zstd_proc.wait()  # Get final code after kill
+                    zstd_returncode = zstd_proc.wait()
             if zstd_returncode != 0:
-                # Non-zero might be okay if terminated (SIGTERM often 143)
-                logging.warning(f"Warning: zstd process finished with exit code {zstd_returncode}.")
-                # Consider checking stderr if available and return code indicates error
+                if args.test_run:
+                    logging.warning(f"Warning: zstd process finished with exit code {zstd_returncode}.")
+                else:
+                    logging.error(f"zstd process failed with exit code {zstd_returncode}.")
+                    sys.exit(1)
 
         # --- Schema Summary ---
         if chunk_schemas:
@@ -1182,9 +1179,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 logging.error("\nMerge and verification step failed.")
                 # Keep temp files in this case (handled in finally)
                 sys.exit(1)  # Exit if merge/verify fails
-            if not args.test_run and not _verify_source_row_count(
-                line_count, output_parquet_path, args.duckdb_path, args.verbose
-            ):
+            if not args.test_run and not _verify_source_row_count(line_count, output_parquet_path):
                 logging.error("\nSource row-count verification failed.")
                 merge_and_verify_successful = False
                 sys.exit(1)
@@ -1307,11 +1302,34 @@ def _setup_temp_directory(temp_dir_base: str | None, output_path: str) -> str | 
         return None
 
 
+def _write_jsonl_chunk(source: IO[str], output_path: str, max_lines: int) -> int:
+    """Streams at most max_lines from source to a JSONL chunk without buffering them in memory."""
+    lines_written = 0
+    try:
+        with open(output_path, "w", encoding="utf-8") as output:
+            for _ in range(max_lines):
+                line = source.readline()
+                if not line:
+                    break
+                output.write(line)
+                lines_written += 1
+    except Exception:
+        if os.path.exists(output_path):
+            with contextlib.suppress(OSError):
+                os.remove(output_path)
+        raise
+
+    if lines_written == 0:
+        with contextlib.suppress(OSError):
+            os.remove(output_path)
+    return lines_written
+
+
 def _process_chunk(
     args: argparse.Namespace,
     temp_dir_path: str,
     chunk_num: int,
-    chunk_lines: list[str],
+    temp_jsonl_filename: str,
     chunk_start_line: int,
     chunk_end_line: int,
     estimated_total_size: int | None,
@@ -1321,23 +1339,18 @@ def _process_chunk(
     standard_columns: list[str] | None = None,  # Added standard_columns
 ) -> int | None:
     """
-    Processes a single chunk of lines: writes JSONL, introspects schema,
-    converts to Parquet, and cleans up JSONL. Updates chunk_schemas dict directly
+    Processes a streamed JSONL chunk: introspects schema, converts to Parquet,
+    and cleans up JSONL. Updates chunk_schemas dict directly
     and appends to parquet_chunk_files list.
     Returns chunk_byte_size on success, None on failure.
     """
     if standard_columns is None:
         standard_columns = []
     progress_str = f"Processing chunk {chunk_num:>4} (lines {chunk_start_line:,}-{chunk_end_line:,})"
-    temp_jsonl_filename = os.path.join(temp_dir_path, f"chunk_{chunk_num:05d}.jsonl")
     temp_parquet_filename = os.path.join(temp_dir_path, f"chunk_{chunk_num:05d}.parquet")
     chunk_byte_size = 0
 
     try:
-        # Write chunk to temporary JSONL file
-        with open(temp_jsonl_filename, "w", encoding="utf-8") as f_jsonl:
-            f_jsonl.writelines(chunk_lines)
-
         # Update cumulative size and progress string
         try:
             chunk_byte_size = os.path.getsize(temp_jsonl_filename)
@@ -1446,6 +1459,7 @@ def _process_chunk(
 
                 # Build the final COPY command
                 temp_parquet_filename_sql = quote_sql_string(temp_parquet_filename)
+                chunk_order_clause = "ORDER BY author ASC, subreddit ASC, created_utc ASC" if args.no_merge else ""
                 duckdb_query = f"""
                 COPY (
                     SELECT {select_clause}
@@ -1454,7 +1468,7 @@ def _process_chunk(
                                    format='newline_delimited',
                                    ignore_errors=true,
                                    maximum_object_size={DUCKDB_MAXIMUM_OBJECT_SIZE})
-                    ORDER BY author ASC, subreddit ASC, created_utc ASC
+                    {chunk_order_clause}
                 ) TO {temp_parquet_filename_sql} (FORMAT PARQUET, CODEC {DUCKDB_ZSTD_CODEC});
 
                 """
