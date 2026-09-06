@@ -11,7 +11,12 @@ from commands.run import run_conversion_loop
 from core import config
 from core.converter import convert_to_parquet
 from core.processor import get_files_to_process, process_file
-from engines.chunked_engine import _parquet_metadata_row_count, _write_jsonl_chunk, load_master_schema
+from engines.chunked_engine import (
+    _parquet_metadata_row_count,
+    _write_jsonl_chunk,
+    load_master_schema,
+    parse_arguments,
+)
 from transfer.base_transfer import TransferHandler
 from transfer.ftp_transfer import FtpTransferHandler
 from transfer.local_transfer import LocalTransferHandler
@@ -38,6 +43,29 @@ def test_parquet_metadata_row_count_sums_files(tmp_path):
     pq.write_table(pa.table({"id": [3, 4, 5]}), second_path)
 
     assert _parquet_metadata_row_count([str(first_path), str(second_path)]) == 5
+
+
+def test_chunked_engine_accepts_merge_resource_overrides(tmp_path, monkeypatch):
+    input_path = tmp_path / "RC_2026-05.zst"
+    input_path.write_bytes(b"zstd fixture")
+    monkeypatch.setattr("engines.chunked_engine.shutil.which", lambda _path: "/usr/bin/tool")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "chunked_engine.py",
+            str(input_path),
+            "--merge-threads",
+            "9",
+            "--merge-memory-limit-gb",
+            "25",
+        ],
+    )
+
+    args = parse_arguments()
+
+    assert args.merge_threads == 9
+    assert args.merge_memory_limit_gb == 25
 
 
 def test_local_transfer_rejects_sibling_prefix_path(tmp_path, monkeypatch):

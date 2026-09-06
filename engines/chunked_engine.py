@@ -336,7 +336,13 @@ def parse_duckdb_count(output: str | None) -> int | None:
 
 
 def merge_and_verify_parquet(
-    input_files: list[str], output_path: str, duckdb_path: str, log_dir: str, verbose: bool = False
+    input_files: list[str],
+    output_path: str,
+    duckdb_path: str,
+    log_dir: str,
+    verbose: bool = False,
+    merge_threads_override: int | None = None,
+    merge_memory_override: int | None = None,
 ) -> bool:
     """
     Merges multiple Parquet files into a single output file using DuckDB,
@@ -383,13 +389,19 @@ def merge_and_verify_parquet(
             merge_threads = DUCKDB_THREADS
             merge_memory = DUCKDB_MEMORY_LIMIT_GB
 
-            if len(input_files) > 5:
+            if len(input_files) > 5 and merge_threads_override is None:
                 logging.info(
                     f"Large merge detected ({len(input_files)} chunks). "
-                    "Enabling Ultra-Stable mode: threads=1, memory_limit=16GB."
+                    "Using the ultra-stable single-thread merge default."
                 )
                 merge_threads = 1
+            if len(input_files) > 5 and merge_memory_override is None:
                 merge_memory = min(merge_memory, 16)  # Cap at 16GB for stability
+
+            if merge_threads_override is not None:
+                merge_threads = merge_threads_override
+            if merge_memory_override is not None:
+                merge_memory = merge_memory_override
 
             con.execute(f"SET threads={merge_threads};")
             con.execute(f"SET memory_limit='{merge_memory}GB';")
@@ -792,6 +804,18 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--zstd_path", default=ZSTD_PATH, help=f"Path to the zstd executable (default: '{ZSTD_PATH}')")
     parser.add_argument("--temp_dir", default=None, help="Directory for temporary files (default: system temp)")
     parser.add_argument(
+        "--merge-threads",
+        type=int,
+        default=None,
+        help="Override DuckDB threads for the final merge (default: conservative automatic profile).",
+    )
+    parser.add_argument(
+        "--merge-memory-limit-gb",
+        type=int,
+        default=None,
+        help="Override the DuckDB memory limit for the final merge in GiB.",
+    )
+    parser.add_argument(
         "--test-run",
         action="store_true",
         help="Process only the first 2 chunks with smaller chunk size for testing.",
@@ -823,6 +847,10 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    if args.merge_threads is not None and args.merge_threads < 1:
+        parser.error("--merge-threads must be at least 1.")
+    if args.merge_memory_limit_gb is not None and args.merge_memory_limit_gb < 1:
+        parser.error("--merge-memory-limit-gb must be at least 1.")
 
     # --- Mode-specific Validation ---
     is_zst_conversion_mode = not args.analyze_schemas and not args.merge_only
@@ -962,6 +990,8 @@ def handle_merge_only_mode(args: argparse.Namespace) -> None:
         args.duckdb_path,
         args.log_dir,  # Pass log_dir for stats file
         verbose=args.verbose,
+        merge_threads_override=args.merge_threads,
+        merge_memory_override=args.merge_memory_limit_gb,
     )
 
     if success:
@@ -1174,6 +1204,8 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 args.duckdb_path,
                 args.log_dir,  # Pass log_dir for stats file
                 verbose=args.verbose,
+                merge_threads_override=args.merge_threads,
+                merge_memory_override=args.merge_memory_limit_gb,
             )
             if not merge_and_verify_successful:
                 logging.error("\nMerge and verification step failed.")
