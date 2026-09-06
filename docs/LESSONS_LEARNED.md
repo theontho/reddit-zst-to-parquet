@@ -16,7 +16,7 @@ This document captures the technical challenges and architectural decisions made
 *   **Single-Thread vs. Multi-Thread**: While DuckDB can parse JSON in parallel, modern Reddit archives (2018+) are so rich that multi-threaded parsing exhausts RAM (32GB+) before disk-spilling can trigger.
 *   **Resource-Aware Merge Pattern**: Use the configured DuckDB thread and memory limits, and place spill files explicitly beside the output on fast local storage. Forcing every large merge to one thread can turn the final global sort into a multi-hour bottleneck.
 *   **FIFO Pipe vs. Native Decoder**: DuckDB's native ZSTD decoder crashed on frames using "long-range" compression (`--long`). We switched to a **Named Pipe (FIFO)** approach, using the system `zstd` binary for decompression, which handled every frame correctly.
-*   **Pre-Sorting Chunks for Sort-Efficiency**: When converting massive (>100GB uncompressed) files, the final global `ORDER BY` during the merge step can exceed 250GB of temporary disk space (spill). By sorting each individual chunk during creation, the final merge becomes a more efficient merge-sort of already sorted streams, drastically reducing temporary disk usage.
+*   **Avoid Redundant Chunk Sorting**: When a final global `ORDER BY` is required, sorting every intermediate chunk adds substantial CPU and I/O without letting DuckDB skip the global sort. Keep merge-bound chunks unsorted and sort once during the final merge.
 *   **Large-Scale Merge Stability**: Bound DuckDB memory and temporary storage explicitly while retaining parallel execution. Keep source chunks, output, and spill files on the fastest local disk, and preserve the chunks until row-count verification succeeds.
 
 ## 4. Operational Resilience
