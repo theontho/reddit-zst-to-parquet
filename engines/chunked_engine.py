@@ -814,6 +814,11 @@ def parse_arguments() -> argparse.Namespace:
         help="Skip final merge step, keep Parquet chunks in temp dir.",
     )
     parser.add_argument(
+        "--skip-chunk-sort",
+        action="store_true",
+        help="Write unsorted chunks for maximum dataset throughput. Requires --no-merge.",
+    )
+    parser.add_argument(
         "--merge-only",
         action="store_true",
         help="Skip decompression and chunking. Merge existing .parquet files from input_path directory into output_path.",
@@ -839,6 +844,8 @@ def parse_arguments() -> argparse.Namespace:
         parser.error("--merge-threads must be at least 1.")
     if args.merge_memory_limit_gb is not None and args.merge_memory_limit_gb < 1:
         parser.error("--merge-memory-limit-gb must be at least 1.")
+    if args.skip_chunk_sort and not args.no_merge:
+        parser.error("--skip-chunk-sort requires --no-merge; unsorted chunks make the final global sort less reliable.")
 
     # --- Mode-specific Validation ---
     is_zst_conversion_mode = not args.analyze_schemas and not args.merge_only
@@ -1077,8 +1084,8 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         # Reset chunk_num to the actual starting chunk number for the loop
         chunk_num = start_chunk_num - 1  # Will be incremented to start_chunk_num at loop start
 
-        if not args.no_merge:
-            logging.info("Chunk files will remain unsorted because the final merge performs the global sort.")
+        if args.skip_chunk_sort:
+            logging.info("Chunk sorting disabled for maximum unsorted-dataset throughput.")
 
         # --- Chunk Processing Loop ---
         while True:
@@ -1479,7 +1486,9 @@ def _process_chunk(
 
                 # Build the final COPY command
                 temp_parquet_filename_sql = quote_sql_string(temp_parquet_filename)
-                chunk_order_clause = "ORDER BY author ASC, subreddit ASC, created_utc ASC" if args.no_merge else ""
+                chunk_order_clause = (
+                    "" if args.skip_chunk_sort else "ORDER BY author ASC, subreddit ASC, created_utc ASC"
+                )
                 duckdb_query = f"""
                 COPY (
                     SELECT {select_clause}
