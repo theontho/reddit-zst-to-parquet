@@ -18,8 +18,11 @@ def test_parse_metadata_requires_key_value_pairs():
         parse_metadata(["missing-separator"])
 
 
-@pytest.mark.skipif(shutil.which("zstd") is None, reason="system zstd is required")
-def test_conversion_benchmark_smoke(tmp_path):
+@pytest.mark.parametrize("decoder", ["python-threaded", "system"])
+def test_conversion_benchmark_smoke(tmp_path, decoder):
+    if decoder == "system" and shutil.which("zstd") is None:
+        pytest.skip("system zstd is not available")
+
     records = [
         {
             "id": f"id-{index}",
@@ -55,6 +58,8 @@ def test_conversion_benchmark_smoke(tmp_path):
             str(output),
             "--mode",
             "both",
+            "--decoder",
+            decoder,
             "--rows",
             "4",
             "--repetitions",
@@ -74,6 +79,7 @@ def test_conversion_benchmark_smoke(tmp_path):
     assert result["validation"]["rows"] == 4
     assert result["validation"]["schemas_equal"] is True
     assert result["validation"]["physical_sort_order"] is True
+    assert result["configuration"]["decoder"] == decoder
     assert result["configuration"]["metadata"] == {"protection": "test"}
     assert (
         result["runs"][0]["staged"]["output"]["content_fingerprint"]

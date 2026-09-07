@@ -3,8 +3,8 @@
 `benchmarks.conversion` measures the two conversion paths used in the
 cross-platform RC benchmark:
 
-- `staged`: the production-style system `zstd` decoder copies a row-bounded
-  JSONL chunk, then DuckDB normalizes, sorts, and writes Parquet.
+- `staged`: a bounded background decoder copies a row-bounded JSONL chunk,
+  then DuckDB normalizes, sorts, and writes Parquet.
 - `direct`: DuckDB reads the `.zst` source itself and writes the same normalized,
   sorted rows in one query.
 
@@ -14,8 +14,8 @@ rejects mismatched row counts, schemas, full-row fingerprints, or physical
 sort order. Generated data belongs under ignored `out/`; only compact,
 reviewed results should be copied into `docs/benchmarks/`.
 
-For the portable M5 Max 128 GB handoff procedure, including copying the source
-from external storage to the internal NVMe before timing, see
+For the portable M5 Max 128 GB handoff procedure, including the one-command
+May RC/RS benchmark suite and internal-NVMe staging, see
 [`M5_MAX_128GB.md`](M5_MAX_128GB.md).
 
 ## Setup
@@ -26,8 +26,10 @@ Install the project and development dependencies:
 uv sync --all-groups
 ```
 
-Install `zstd` separately and ensure it is on `PATH`. For the canonical
-`RC_2026-05.zst` comparison, verify that the source is exactly:
+The default `python-threaded` decoder uses the project's `zstandard`
+dependency. Install the `zstd` executable separately only when benchmarking
+the legacy `system` or `text-lines` path. For the canonical `RC_2026-05.zst`
+comparison, verify that the source is exactly:
 
 ```text
 bytes:  47844685635
@@ -52,6 +54,7 @@ uv run python -m benchmarks.conversion \
   --output-dir out/benchmarks/RC_2026-05/staged-$(hostname) \
   --mode staged \
   --copy-mode block \
+  --decoder python-threaded \
   --rows 4000000 \
   --repetitions 3 \
   --warmups 0 \
@@ -69,6 +72,7 @@ uv run python -m benchmarks.conversion `
   --output-dir 'out\benchmarks\RC_2026-05\staged-windows' `
   --mode staged `
   --copy-mode block `
+  --decoder python-threaded `
   --rows 4000000 `
   --repetitions 3 `
   --warmups 0 `
@@ -78,7 +82,8 @@ uv run python -m benchmarks.conversion `
   --metadata power_plan=Balanced
 ```
 
-If `zstd` is not on `PATH`, pass its complete path with `--zstd`.
+To reproduce the earlier subprocess results, use `--decoder system`. If
+`zstd` is not on `PATH`, also pass its complete path with `--zstd`.
 
 ## Direct DuckDB and text-line comparisons
 
@@ -94,8 +99,9 @@ uv run python -m benchmarks.conversion \
 ```
 
 To measure the former Python text-line staging path, use `--mode staged
---copy-mode text-lines`. To collect staged and direct results in one run, use
-`--mode both`; their execution order alternates between repetitions.
+--copy-mode text-lines --decoder system`. To collect staged and direct results
+in one run, use `--mode both`; their execution order alternates between
+repetitions.
 
 Direct ingestion is a one-pass comparison, not the production chunking design.
 Using repeated `LIMIT/OFFSET` queries would decompress the source for every
@@ -106,7 +112,7 @@ chunk.
 Compare `result.json` files only when all of these match:
 
 - source SHA-256 and row count
-- DuckDB version, schema, codec, sort keys, and memory limit
+- decoder, DuckDB version, schema, codec, sort keys, and memory limit
 - warm-up and repetition counts
 - protection/power metadata and absence of competing workloads
 - `validation.content_fingerprint` and `physical_sort_order`

@@ -17,6 +17,7 @@ from typing import BinaryIO, TextIO, cast
 
 import duckdb
 import psutil
+import zstandard
 
 from engines.chunked_engine import (
     BIGINT_COLUMNS,
@@ -24,6 +25,7 @@ from engines.chunked_engine import (
     DUCKDB_MAXIMUM_OBJECT_SIZE,
     STREAM_BLOCK_SIZE,
     BinaryLineChunker,
+    ThreadedZstdReader,
     load_master_schema,
 )
 
@@ -111,6 +113,8 @@ def system_metadata(zstd_path: str) -> dict[str, object]:
         "python": platform.python_version(),
         "duckdb": duckdb.__version__,
         "zstd": command_output([zstd_path, "--version"]),
+        "python_zstandard": zstandard.__version__,
+        "python_zstandard_libzstd": ".".join(str(part) for part in zstandard.ZSTD_VERSION),
         "git": git_metadata(),
     }
 
@@ -305,7 +309,7 @@ def finish_zstd_process(process: subprocess.Popen[bytes] | subprocess.Popen[str]
         process.wait()
 
 
-def stage_binary(source: Path, output: Path, *, rows: int, zstd_path: str) -> tuple[float, int]:
+def stage_binary_system(source: Path, output: Path, *, rows: int, zstd_path: str) -> tuple[float, int]:
     started = time.monotonic()
     process = subprocess.Popen(
         [zstd_path, "-dcf", "--long=31", str(source)],
@@ -319,6 +323,13 @@ def stage_binary(source: Path, output: Path, *, rows: int, zstd_path: str) -> tu
         count = BinaryLineChunker(cast(BinaryIO, process.stdout)).write_chunk(str(output), rows)
     finally:
         finish_zstd_process(process)
+    return time.monotonic() - started, count
+
+
+def stage_binary_python(source: Path, output: Path, *, rows: int) -> tuple[float, int]:
+    started = time.monotonic()
+    with ThreadedZstdReader(str(source)) as reader:
+        count = BinaryLineChunker(reader).write_chunk(str(output), rows)
     return time.monotonic() - started, count
 
 
@@ -356,9 +367,12 @@ def stage_source(
     rows: int,
     zstd_path: str,
     copy_mode: str,
+    decoder: str,
 ) -> tuple[float, int]:
     if copy_mode == "block":
-        return stage_binary(source, output, rows=rows, zstd_path=zstd_path)
+        if decoder == "python-threaded":
+            return stage_binary_python(source, output, rows=rows)
+        return stage_binary_system(source, output, rows=rows, zstd_path=zstd_path)
     return stage_text(source, output, rows=rows, zstd_path=zstd_path)
 
 
@@ -485,6 +499,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--threads", type=int, default=default_threads())
     parser.add_argument("--memory-limit-gb", type=int, default=default_memory_limit_gb())
     parser.add_argument("--zstd", default="zstd", help="zstd executable name or path")
+    parser.add_argument(
+        "--decoder",
+        choices=("python-threaded", "system"),
+        default="python-threaded",
+        help="Zstandard decoder for block staging (default: python-threaded)",
+    )
     parser.add_argument("--mode", choices=("staged", "direct", "both"), default="staged")
     parser.add_argument("--copy-mode", choices=("block", "text-lines"), default="block")
     parser.add_argument("--keep-artifacts", action="store_true")
@@ -509,6 +529,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--threads must be positive")
     if args.memory_limit_gb < 1:
         raise ValueError("--memory-limit-gb must be positive")
+    if args.mode in {"staged", "both"} and args.copy_mode == "text-lines" and args.decoder != "system":
+        raise ValueError("--copy-mode text-lines requires --decoder system")
 
 
 def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
@@ -523,7 +545,10 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
     if result_path.exists() or schema_path.exists():
         raise FileExistsError(f"Benchmark metadata already exists in {output_dir}")
 
-    zstd_path = resolve_zstd(args.zstd)
+    requires_system_zstd = args.mode in {"staged", "both"} and (
+        args.decoder == "system" or args.copy_mode == "text-lines"
+    )
+    zstd_path = resolve_zstd(args.zstd) if requires_system_zstd else shutil.which(args.zstd) or args.zstd
     master_columns = load_master_schema(str(source))
     if not master_columns:
         raise ValueError("Source filename must contain RC_ or RS_ so the matching master schema can be selected")
@@ -580,6 +605,7 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
                 rows=args.rows,
                 zstd_path=zstd_path,
                 copy_mode=args.copy_mode,
+                decoder=args.decoder,
             )
             if staged_rows != args.rows:
                 raise RuntimeError(f"Expected {args.rows:,} staged rows, got {staged_rows:,}")
@@ -659,7 +685,7 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
 
     result: dict[str, object] = {
         "benchmark": "Reddit ZST to sorted Parquet conversion",
-        "benchmark_version": 1,
+        "benchmark_version": 2,
         "started_utc": started_utc,
         "ended_utc": datetime.now(timezone.utc).isoformat(),
         "source": {
@@ -677,6 +703,7 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, object]:
             "max_temp_bytes": max_temp_bytes,
             "mode": args.mode,
             "copy_mode": args.copy_mode,
+            "decoder": args.decoder,
             "binary_block_bytes": STREAM_BLOCK_SIZE,
             "compression": "ZSTD",
             "sort": list(SORT_KEYS),

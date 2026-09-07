@@ -6,13 +6,17 @@ import glob
 import json
 import logging
 import os
+import queue
 import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from importlib import resources
-from typing import IO
+from typing import IO, Protocol
+
+import zstandard
 
 # Add parent directory to path to allow imports from the main package
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -866,6 +870,12 @@ def parse_arguments() -> argparse.Namespace:
         "--duckdb_path", default=DUCKDB_PATH, help=f"Path to the duckdb executable (default: '{DUCKDB_PATH}')"
     )
     parser.add_argument("--zstd_path", default=ZSTD_PATH, help=f"Path to the zstd executable (default: '{ZSTD_PATH}')")
+    parser.add_argument(
+        "--zstd-decoder",
+        choices=("python-threaded", "system"),
+        default="python-threaded",
+        help="Zstandard decoder for chunk staging (default: python-threaded; system uses --zstd_path)",
+    )
     parser.add_argument("--temp_dir", default=None, help="Directory for temporary files (default: system temp)")
     parser.add_argument(
         "--merge-threads",
@@ -981,9 +991,7 @@ def parse_arguments() -> argparse.Namespace:
         parser.error(
             f"Cannot find duckdb executable at '{args.duckdb_path}'. Use --duckdb_path or ensure it's in PATH."
         )
-    if (
-        not args.merge_only and not args.analyze_schemas and not shutil.which(args.zstd_path)
-    ):  # Only check zstd if not merge/analyze
+    if is_zst_conversion_mode and args.zstd_decoder == "system" and not shutil.which(args.zstd_path):
         parser.error(f"Cannot find zstd executable at '{args.zstd_path}'. Use --zstd_path or ensure it's in PATH.")
 
     if is_zst_conversion_mode:
@@ -1103,29 +1111,34 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
     chunk_schemas: dict[int, dict[str, str]] = {}
     merge_and_verify_successful = False  # Initialize success flag
     zstd_proc = None  # Define before try block
+    threaded_zstd_reader = None
     line_count = 0  # Start line count from 0 for skipping logic
     chunk_num = start_chunk_num - 1  # Start chunk_num logic correctly
     cumulative_bytes_processed = 0  # Reset progress estimate for simplicity
 
     try:
-        # Start zstd decompression process
-        zstd_cmd = [args.zstd_path, "-dcvf", f"--long={ZSTD_LONG_RANGE_BITS}", input_zst_path]
+        if args.zstd_decoder == "python-threaded":
+            logging.info("Using bounded threaded Python Zstandard decoder.")
+            threaded_zstd_reader = ThreadedZstdReader(input_zst_path)
+            decompressed_stream: BinaryReadable = threaded_zstd_reader
+        else:
+            zstd_cmd = [args.zstd_path, "-dcvf", f"--long={ZSTD_LONG_RANGE_BITS}", input_zst_path]
+            if args.verbose:
+                logging.debug(f"Starting decompression command: {' '.join(zstd_cmd)}")
+            try:
+                zstd_proc = subprocess.Popen(zstd_cmd, stdout=subprocess.PIPE, bufsize=STREAM_BLOCK_SIZE)
+            except FileNotFoundError:
+                logging.error(f"Error: Failed to start zstd process. Command not found at '{args.zstd_path}'.")
+                sys.exit(1)
+            except Exception as e:
+                logging.error(f"Error starting zstd process: {e}")
+                sys.exit(1)
 
-        if args.verbose:
-            logging.debug(f"Starting decompression command: {' '.join(zstd_cmd)}")
-        try:
-            zstd_proc = subprocess.Popen(zstd_cmd, stdout=subprocess.PIPE, bufsize=STREAM_BLOCK_SIZE)
-        except FileNotFoundError:
-            logging.error(f"Error: Failed to start zstd process. Command not found at '{args.zstd_path}'.")
-            sys.exit(1)
-        except Exception as e:
-            logging.error(f"Error starting zstd process: {e}")
-            sys.exit(1)
-
-        if zstd_proc.stdout is None:
-            logging.error("Error: Could not get stdout from zstd process.")
-            sys.exit(1)
-        chunk_reader = BinaryLineChunker(zstd_proc.stdout)
+            if zstd_proc.stdout is None:
+                logging.error("Error: Could not get stdout from zstd process.")
+                sys.exit(1)
+            decompressed_stream = zstd_proc.stdout
+        chunk_reader = BinaryLineChunker(decompressed_stream)
 
         # --- Skip Lines for Resume ---
         if lines_to_skip > 0:
@@ -1163,7 +1176,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
                 line_count += chunk_line_count
             except Exception as e:
                 logging.error(f"\nError reading from zstd stream during chunk {chunk_num}: {e}")
-                if zstd_proc.poll() is not None:
+                if zstd_proc is not None and zstd_proc.poll() is not None:
                     logging.error(f"zstd process exited unexpectedly with code {zstd_proc.returncode}.")
                 sys.exit(1)
 
@@ -1287,6 +1300,9 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         sys.exit(1)  # General exit code for unexpected errors
 
     finally:
+        if threaded_zstd_reader is not None:
+            threaded_zstd_reader.close()
+
         # Gracefully terminate zstd if it's somehow still running
         if zstd_proc and zstd_proc.poll() is None:
             logging.warning("Terminating zstd process in finally block...")
@@ -1408,10 +1424,97 @@ def _setup_temp_directory(temp_dir_base: str | None, output_path: str) -> str | 
         return None
 
 
+class BinaryReadable(Protocol):
+    def read(self, size: int = -1, /) -> bytes: ...
+
+
+class ThreadedZstdReader:
+    """Decompresses ahead by a bounded number of blocks on a worker thread."""
+
+    def __init__(
+        self,
+        source_path: str,
+        block_size: int = STREAM_BLOCK_SIZE,
+        queue_blocks: int = 2,
+    ):
+        if block_size < 1:
+            raise ValueError("block_size must be positive")
+        if queue_blocks < 1:
+            raise ValueError("queue_blocks must be positive")
+        self.source_path = source_path
+        self.block_size = block_size
+        self._queue: queue.Queue[bytes | Exception | None] = queue.Queue(maxsize=queue_blocks)
+        self._stop = threading.Event()
+        self._eof = False
+        self._closed = False
+        self._thread = threading.Thread(
+            target=self._produce,
+            name="zstd-decompressor",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def _enqueue(self, item: bytes | Exception | None) -> None:
+        while not self._stop.is_set():
+            try:
+                self._queue.put(item, timeout=0.1)
+                return
+            except queue.Full:
+                continue
+
+    def _produce(self) -> None:
+        try:
+            decompressor = zstandard.ZstdDecompressor(max_window_size=2**ZSTD_LONG_RANGE_BITS)
+            with (
+                open(self.source_path, "rb") as compressed,
+                decompressor.stream_reader(compressed, read_across_frames=True) as reader,
+            ):
+                while not self._stop.is_set():
+                    data = reader.read(self.block_size)
+                    if not data:
+                        self._enqueue(None)
+                        return
+                    self._enqueue(data)
+        except Exception as error:
+            self._enqueue(error)
+
+    def read(self, size: int = -1, /) -> bytes:
+        if self._closed:
+            raise ValueError("read from closed Zstandard stream")
+        if self._eof:
+            return b""
+        if size not in (-1, self.block_size):
+            raise ValueError(f"read size must be {self.block_size} or -1")
+
+        item = self._queue.get()
+        if isinstance(item, Exception):
+            raise item
+        if item is None:
+            self._eof = True
+            return b""
+        return item
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._stop.set()
+        while self._thread.is_alive():
+            with contextlib.suppress(queue.Empty):
+                self._queue.get_nowait()
+            self._thread.join(timeout=0.1)
+
+    def __enter__(self) -> "ThreadedZstdReader":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
+
+
 class BinaryLineChunker:
     """Copies line-bounded chunks with block I/O and a small carry buffer."""
 
-    def __init__(self, source: IO[bytes], block_size: int = STREAM_BLOCK_SIZE):
+    def __init__(self, source: BinaryReadable, block_size: int = STREAM_BLOCK_SIZE):
         if block_size < 1:
             raise ValueError("block_size must be positive")
         self.source = source

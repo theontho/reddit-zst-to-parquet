@@ -6,6 +6,8 @@ from typing import cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
+import zstandard
 
 from commands.run import run_conversion_loop
 from core import config
@@ -13,6 +15,7 @@ from core.converter import convert_to_parquet
 from core.processor import get_files_to_process, process_file
 from engines.chunked_engine import (
     BinaryLineChunker,
+    ThreadedZstdReader,
     _initialize_resume_state,
     _parquet_metadata_row_count,
     adaptive_chunk_size,
@@ -51,6 +54,31 @@ def test_binary_line_chunker_skips_without_losing_buffered_bytes(tmp_path):
     assert output_path.read_bytes() == b"three\nfour\n"
 
 
+def test_threaded_zstd_reader_preserves_chunk_boundaries(tmp_path):
+    source_path = tmp_path / "source.zst"
+    output_path = tmp_path / "chunk.jsonl"
+    compressor = zstandard.ZstdCompressor()
+    source_path.write_bytes(compressor.compress(b"one\ntwo\n") + compressor.compress(b"three\nfour"))
+
+    with ThreadedZstdReader(str(source_path), block_size=7, queue_blocks=1) as reader:
+        chunker = BinaryLineChunker(reader, block_size=7)
+        assert chunker.write_chunk(str(output_path), 2) == 2
+        assert output_path.read_bytes() == b"one\ntwo\n"
+        assert chunker.write_chunk(str(output_path), 2) == 2
+        assert output_path.read_bytes() == b"three\nfour"
+
+
+def test_threaded_zstd_reader_propagates_decoder_errors(tmp_path):
+    source_path = tmp_path / "invalid.zst"
+    source_path.write_bytes(b"not a Zstandard frame")
+
+    with (
+        ThreadedZstdReader(str(source_path), block_size=7, queue_blocks=1) as reader,
+        pytest.raises(zstandard.ZstdError),
+    ):
+        reader.read(7)
+
+
 def test_parquet_metadata_row_count_sums_files(tmp_path):
     first_path = tmp_path / "first.parquet"
     second_path = tmp_path / "second.parquet"
@@ -81,6 +109,20 @@ def test_chunked_engine_accepts_merge_resource_overrides(tmp_path, monkeypatch):
 
     assert args.merge_threads == 9
     assert args.merge_memory_limit_gb == 25
+
+
+def test_chunked_engine_uses_python_decoder_without_system_zstd(tmp_path, monkeypatch):
+    input_path = tmp_path / "RC_2026-05.zst"
+    input_path.write_bytes(b"zstd fixture")
+    monkeypatch.setattr(
+        "engines.chunked_engine.shutil.which",
+        lambda path: "/usr/bin/duckdb" if path == config.DUCKDB_PATH else None,
+    )
+    monkeypatch.setattr(sys, "argv", ["chunked_engine.py", str(input_path)])
+
+    args = parse_arguments()
+
+    assert args.zstd_decoder == "python-threaded"
 
 
 def test_effective_duckdb_memory_limit_respects_host_headroom():
@@ -134,6 +176,7 @@ def test_chunked_engine_automatically_sizes_chunks_from_memory(tmp_path, monkeyp
     monkeypatch.setattr("engines.chunked_engine.DUCKDB_MEMORY_LIMIT_GB", 25)
     monkeypatch.setattr("engines.chunked_engine.DUCKDB_THREADS", 15)
     monkeypatch.setattr("engines.chunked_engine.TOTAL_RAM_GB", 16)
+    monkeypatch.setattr("engines.chunked_engine.psutil.cpu_count", lambda logical=False: 8)
     monkeypatch.setattr(
         sys,
         "argv",
