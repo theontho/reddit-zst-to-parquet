@@ -11,6 +11,8 @@ The cross-platform Mac and Windows optimization results are in
 The same benchmark rerun on the former Windows machine after installing Linux
 is in
 [`docs/benchmarks/RC_2026-05-linux-comparison.json`](benchmarks/RC_2026-05-linux-comparison.json).
+The native-NVMe 4M/6M follow-up is in
+[`docs/benchmarks/RC_2026-05-linux-nvme-chunks.json`](benchmarks/RC_2026-05-linux-nvme-chunks.json).
 Use the tracked [`benchmarks.conversion`](../benchmarks/README.md) harness to
 rerun the staged or direct conversion paths on macOS, Windows, or Linux. It
 captures environment metadata and validates source hashes, row counts,
@@ -150,16 +152,41 @@ matched the Mac and Windows runs exactly.
 
 Linux was **7.3% faster overall than Windows** on the identical Ryzen hardware.
 Its DuckDB parse, normalize, sort, and Parquet phase was 21.8% faster, while
-staging was 18.2% slower. The staging result includes Zstandard decompression
-and reads through NTFS/FUSE, so this benchmark does not isolate filesystem
-overhead from decoder or operating-system differences. The M1 Pro remained
-2.06x faster than Ryzen/Linux overall, with 1.95x and 2.15x advantages in the
+staging was 18.2% slower. A native-NVMe follow-up below showed that NTFS/FUSE
+was not the cause of the staging gap. The M1 Pro remained 2.06x faster than
+this initial Ryzen/Linux run overall, with 1.95x and 2.15x advantages in the
 staging and Parquet phases respectively.
 
 All three Linux runs produced 4,000,000 rows with content fingerprint
 `7365298922509737757`, the same schema as the Mac and Windows outputs, and zero
 physical sort-order violations. The three totals were 32.26, 31.64, and 31.96
 seconds.
+
+#### Native-NVMe Linux follow-up
+
+The complete 47.8 GB source was copied to the SK hynix NVMe's native ext4
+filesystem and its SHA-256 was reverified before rerunning. Source, staged
+JSONL, DuckDB temporary data, and Parquet output were therefore all on the
+same NVMe:
+
+| Rows | Median stage | Median Parquet | Median total | Throughput | Output |
+|---:|---:|---:|---:|---:|---:|
+| 4M | 14.43 s | 17.19 s | 31.52 s | 126,907 rows/s | 574 MiB |
+| 6M | 21.98 s | 24.94 s | 46.92 s | 127,888 rows/s | 858 MiB |
+
+Moving the source from SATA NTFS/FUSE to the internal NVMe improved the 4M
+median by only 1.4% overall and improved staging by just 0.2%. Zstandard
+decompression, rather than source-drive throughput, was the limiting part of
+staging. Against Windows on the same Ryzen hardware, the native-NVMe Linux run
+was 8.6% faster overall: Linux staging remained 17.9% slower, while its
+DuckDB/Parquet phase was 22.8% faster. The M1 Pro was 2.03x faster overall.
+
+The 6M chunk was 0.8% faster per row than 4M, which is within normal run
+variance and confirms that chunk size does not materially change throughput.
+All six native-NVMe runs matched their expected row count and schema, had
+consistent fingerprints within each row count, and had zero physical
+sort-order violations. The 4M fingerprint was `7365298922509737757`; the 6M
+fingerprint was `2755064075187337237`.
 
 The 4M Windows result was slightly faster per row than 2M and 6M:
 

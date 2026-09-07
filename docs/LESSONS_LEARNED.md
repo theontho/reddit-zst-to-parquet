@@ -68,11 +68,20 @@ change, not antivirus configuration, produced the measured speedup.
 After replacing Windows with Ubuntu on the same Ryzen 3 PRO 5350GE machine,
 the matched 4M-row staged conversion took 31.96 seconds, 7.3% less wall time
 than Windows. Linux's DuckDB phase was 21.8% faster, but staging from the same
-SATA source disk was 18.2% slower while the preserved NTFS volume was mounted
-read-only through FUSE. This supports Linux for the conversion host, but also
-reinforces the recommendation to keep active source and scratch data on a
-native fast filesystem rather than treating the operating system alone as the
-optimization.
+SATA source disk was 18.2% slower.
+
+A controlled follow-up copied the complete source onto the Linux host's native
+NVMe and reverified its SHA-256. Staging improved only 0.2%, from 14.46 to
+14.43 seconds, proving the NTFS/FUSE source path was not the meaningful
+bottleneck. The native-NVMe total was 31.52 seconds, 8.6% faster than Windows.
+The OS comparison therefore comes mainly from Linux's 22.8% faster DuckDB
+phase, while the remaining staging difference is in decompression or other
+platform behavior rather than source storage.
+
+The native-NVMe 6M run sustained 127,888 rows/s versus 126,907 rows/s at 4M,
+a 0.8% difference within normal variance. This independently confirms that
+larger chunks reduce file count but do not materially improve conversion
+throughput.
 
 DuckDB 1.5.2 successfully read the tested long-range-compressed Zstandard file
 directly. Older DuckDB versions previously required the system `zstd` decoder

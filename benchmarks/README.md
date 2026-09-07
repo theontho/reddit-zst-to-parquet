@@ -14,6 +14,10 @@ rejects mismatched row counts, schemas, full-row fingerprints, or physical
 sort order. Generated data belongs under ignored `out/`; only compact,
 reviewed results should be copied into `docs/benchmarks/`.
 
+For the portable M5 Max 128 GB handoff procedure, including copying the source
+from external storage to the internal NVMe before timing, see
+[`M5_MAX_128GB.md`](M5_MAX_128GB.md).
+
 ## Setup
 
 Install the project and development dependencies:

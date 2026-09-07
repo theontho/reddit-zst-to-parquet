@@ -107,5 +107,11 @@
     "schema_match": true,
     "physical_sort_violations": 0
   },
-  "conclusion": "Linux reduced total wall time by 7.3% on the same Ryzen hardware. Its DuckDB phase was 21.8% faster than Windows, while staging was 18.2% slower with the source read through NTFS/FUSE. The M1 Pro remained 2.06x faster overall."
+  "native_nvme_follow_up": {
+    "result_file": "RC_2026-05-linux-nvme-chunks.json",
+    "median_stage_seconds": 14.430557,
+    "stage_reduction_percent": 0.2,
+    "conclusion": "Moving the source from SATA NTFS/FUSE to native ext4 on the internal NVMe did not materially change staging, so the source filesystem was not the cause of the Linux/Windows staging difference."
+  },
+  "conclusion": "Linux reduced total wall time by 7.3% on the same Ryzen hardware. Its DuckDB phase was 21.8% faster than Windows, while staging was 18.2% slower. The native-NVMe follow-up showed that source storage did not explain the staging difference. The M1 Pro remained 2.06x faster overall."
 }

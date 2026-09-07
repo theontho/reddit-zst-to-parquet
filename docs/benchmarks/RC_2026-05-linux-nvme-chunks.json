@@ -1,0 +1,150 @@
+{
+  "benchmark_date": "2026-09-07",
+  "benchmark": "Linux native-NVMe staged chunk comparison",
+  "benchmark_version": 1,
+  "harness": {
+    "path": "benchmarks/conversion.py",
+    "git_commit": "128ca19f6e14c61520ce6ef5ccb7731720abc0f0",
+    "git_dirty": false
+  },
+  "source": {
+    "filename": "RC_2026-05.zst",
+    "bytes": 47844685635,
+    "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+    "filesystem": "ext4",
+    "disk": "SK hynix SHGP31-1000GM-2 NVMe",
+    "copy_seconds_from_sata": 97,
+    "hash_verified_after_copy": true
+  },
+  "system": {
+    "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+    "cpu": "AMD Ryzen 3 PRO 5350GE with Radeon Graphics",
+    "physical_cores": 4,
+    "logical_cores": 8,
+    "memory_bytes": 32998207488,
+    "python": "3.12.3",
+    "duckdb": "1.5.2",
+    "zstd_cli": "1.5.5",
+    "protection": "none",
+    "cpu_frequency_driver": "amd-pstate-epp",
+    "power_governor": "powersave",
+    "energy_performance_preference": "performance"
+  },
+  "configuration": {
+    "repetitions": 3,
+    "warmups": 0,
+    "threads": 4,
+    "memory_limit_gb": 25,
+    "mode": "staged",
+    "copy_mode": "block",
+    "binary_block_bytes": 8388608,
+    "compression": "ZSTD",
+    "sort": [
+      "author",
+      "subreddit",
+      "created_utc"
+    ],
+    "source_disk": "SK hynix SHGP31-1000GM-2 NVMe",
+    "output_disk": "SK hynix SHGP31-1000GM-2 NVMe"
+  },
+  "chunks": {
+    "4000000": {
+      "jsonl_bytes": 7804469466,
+      "runs": [
+        {
+          "stage_seconds": 14.504615,
+          "parquet_seconds": 17.497184,
+          "total_seconds": 32.001799,
+          "rows_per_second": 124993.0,
+          "output_bytes": 601760590
+        },
+        {
+          "stage_seconds": 14.328298,
+          "parquet_seconds": 17.190815,
+          "total_seconds": 31.519112,
+          "rows_per_second": 126907.1,
+          "output_bytes": 601764820
+        },
+        {
+          "stage_seconds": 14.430557,
+          "parquet_seconds": 17.024346,
+          "total_seconds": 31.454903,
+          "rows_per_second": 127166.2,
+          "output_bytes": 601765026
+        }
+      ],
+      "median": {
+        "stage_seconds": 14.430557,
+        "parquet_seconds": 17.190815,
+        "total_seconds": 31.519112,
+        "rows_per_second": 126907.1
+      },
+      "validation": {
+        "rows": 4000000,
+        "content_fingerprint": 7365298922509737757,
+        "schema_match": true,
+        "physical_sort_violations": 0
+      }
+    },
+    "6000000": {
+      "jsonl_bytes": 11718859584,
+      "runs": [
+        {
+          "stage_seconds": 24.390176,
+          "parquet_seconds": 25.333778,
+          "total_seconds": 49.723954,
+          "rows_per_second": 120666.2,
+          "output_bytes": 899207876
+        },
+        {
+          "stage_seconds": 21.975207,
+          "parquet_seconds": 24.940877,
+          "total_seconds": 46.916084,
+          "rows_per_second": 127887.9,
+          "output_bytes": 899207374
+        },
+        {
+          "stage_seconds": 21.684619,
+          "parquet_seconds": 24.783632,
+          "total_seconds": 46.468251,
+          "rows_per_second": 129120.4,
+          "output_bytes": 899208162
+        }
+      ],
+      "median": {
+        "stage_seconds": 21.975207,
+        "parquet_seconds": 24.940877,
+        "total_seconds": 46.916084,
+        "rows_per_second": 127887.9
+      },
+      "validation": {
+        "rows": 6000000,
+        "content_fingerprint": 2755064075187337237,
+        "schema_match": true,
+        "physical_sort_violations": 0
+      }
+    }
+  },
+  "comparisons": {
+    "nvme_4m_vs_sata_ntfs_4m": {
+      "stage_time_reduction_percent": 0.2,
+      "parquet_time_reduction_percent": 1.2,
+      "total_time_reduction_percent": 1.4
+    },
+    "nvme_4m_vs_windows_4m_same_hardware": {
+      "linux_stage_time_increase_percent": 17.9,
+      "linux_parquet_time_reduction_percent": 22.8,
+      "linux_total_time_reduction_percent": 8.6
+    },
+    "nvme_4m_vs_m1_pro_4m": {
+      "linux_to_mac_stage_time_ratio": 1.9466,
+      "linux_to_mac_parquet_time_ratio": 2.1221,
+      "linux_to_mac_total_time_ratio": 2.0317
+    },
+    "6m_vs_4m": {
+      "throughput_increase_percent": 0.8,
+      "total_time_below_linear_scaling_percent": 0.8
+    }
+  },
+  "conclusion": "Native-NVMe source placement did not materially improve staging over SATA NTFS/FUSE. The 4M and 6M chunks had effectively identical per-row throughput, confirming that 6M reduces file count without providing a meaningful conversion-speed gain."
+}
