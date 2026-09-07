@@ -1,0 +1,105 @@
+{
+  "benchmark_date": "2026-09-06",
+  "source": {
+    "filename": "RC_2026-05.zst",
+    "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+    "rows": 349577451
+  },
+  "environment": {
+    "machine": "Apple M1 Pro MacBook",
+    "duckdb": "1.5.2",
+    "threads": 9,
+    "memory_limit": "25GB"
+  },
+  "layouts": {
+    "merged": {
+      "files": 1,
+      "row_groups": 3485,
+      "bytes": 46771953794,
+      "globally_sorted": true
+    },
+    "chunks": {
+      "files": 88,
+      "row_groups": 3496,
+      "bytes": 53612379234,
+      "globally_sorted": false,
+      "each_file_sorted": true,
+      "matching_schema": true,
+      "preparation_seconds": 658.48
+    }
+  },
+  "method": {
+    "repetitions": 7,
+    "warmups_per_layout": 1,
+    "fresh_connection_per_query": true,
+    "layout_order_alternated": true,
+    "full_rows_definition": "count plus bit_xor(hash(row)) to force all columns without result-transfer cost",
+    "all_results_equal": true
+  },
+  "queries": {
+    "rare_author_count": {
+      "predicate": "author = 'marvekin'",
+      "rows": 14,
+      "merged_median_seconds": 0.145324,
+      "chunks_median_seconds": 0.069526,
+      "chunks_over_merged_ratio": 0.478423
+    },
+    "rare_author_full_rows": {
+      "predicate": "author = 'marvekin'",
+      "rows": 14,
+      "merged_median_seconds": 0.421471,
+      "chunks_median_seconds": 0.345754,
+      "chunks_over_merged_ratio": 0.820350
+    },
+    "active_author_full_rows": {
+      "predicate": "author = 'RemyM00n_'",
+      "rows": 2000,
+      "merged_median_seconds": 0.395598,
+      "chunks_median_seconds": 0.483242,
+      "chunks_over_merged_ratio": 1.221548
+    },
+    "subreddit_count": {
+      "predicate": "subreddit = 'AskReddit'",
+      "rows": 3827403,
+      "merged_median_seconds": 0.587730,
+      "chunks_median_seconds": 1.293700,
+      "chunks_over_merged_ratio": 2.201180
+    },
+    "subreddit_full_rows": {
+      "predicate": "subreddit = 'AskReddit'",
+      "rows": 3827403,
+      "merged_median_seconds": 36.843715,
+      "chunks_median_seconds": 41.760240,
+      "chunks_over_merged_ratio": 1.133443
+    },
+    "author_subreddit_full_rows": {
+      "predicate": "author = 'marvekin' AND subreddit = 'AskReddit'",
+      "rows": 6,
+      "merged_median_seconds": 0.433648,
+      "chunks_median_seconds": 0.352887,
+      "chunks_over_merged_ratio": 0.813765
+    },
+    "one_day_count": {
+      "predicate": "created_utc >= 1778803200 AND created_utc < 1778889600",
+      "rows": 11168982,
+      "merged_median_seconds": 0.779589,
+      "chunks_median_seconds": 0.077910,
+      "chunks_over_merged_ratio": 0.099937
+    },
+    "one_day_full_rows": {
+      "predicate": "created_utc >= 1778803200 AND created_utc < 1778889600",
+      "rows": 11168982,
+      "merged_median_seconds": 40.576776,
+      "chunks_median_seconds": 2.555568,
+      "chunks_over_merged_ratio": 0.062981
+    }
+  },
+  "matching_chunk_distribution": {
+    "rare_author": 4,
+    "active_author": 21,
+    "subreddit": 88,
+    "author_and_subreddit": 2,
+    "one_day": 4
+  },
+  "conclusion": "Independent sorted chunks retain subsecond author queries and are much faster for time filters. The global merge mainly benefits prolific-author and subreddit-wide scans while reducing storage."
+}

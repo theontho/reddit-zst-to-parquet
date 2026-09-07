@@ -12,8 +12,12 @@ from core import config
 from core.converter import convert_to_parquet
 from core.processor import get_files_to_process, process_file
 from engines.chunked_engine import (
+    _initialize_resume_state,
     _parquet_metadata_row_count,
     _write_jsonl_chunk,
+    adaptive_chunk_size,
+    adaptive_chunk_threads,
+    effective_duckdb_memory_limit_gb,
     load_master_schema,
     parse_arguments,
 )
@@ -66,6 +70,83 @@ def test_chunked_engine_accepts_merge_resource_overrides(tmp_path, monkeypatch):
 
     assert args.merge_threads == 9
     assert args.merge_memory_limit_gb == 25
+
+
+def test_effective_duckdb_memory_limit_respects_host_headroom():
+    assert effective_duckdb_memory_limit_gb(25, total_ram_gb=32, ram_usage_factor=0.8) == 25
+    assert effective_duckdb_memory_limit_gb(25, total_ram_gb=16, ram_usage_factor=0.8) == 12
+    assert effective_duckdb_memory_limit_gb(8, total_ram_gb=32, ram_usage_factor=0.8) == 8
+
+
+def test_adaptive_chunk_size_uses_spill_free_memory_ratio():
+    assert adaptive_chunk_size("RC_2026-05.zst", 8) == 2_000_000
+    assert adaptive_chunk_size("RC_2026-05.zst", 12) == 3_000_000
+    assert adaptive_chunk_size("RC_2026-05.zst", 25) == 6_000_000
+    assert adaptive_chunk_size("RC_2026-05.zst", 64) == 6_000_000
+
+
+def test_adaptive_chunk_size_uses_measured_submission_memory_curve():
+    assert adaptive_chunk_size("RS_2026-05.zst", 8) == 250_000
+    assert adaptive_chunk_size("RS_2026-05.zst", 12) == 500_000
+    assert adaptive_chunk_size("RS_2026-05.zst", 25) == 1_500_000
+    assert adaptive_chunk_size("RS_2026-05.zst", 64) == 1_500_000
+
+
+def test_adaptive_chunk_threads_retains_memory_headroom():
+    assert adaptive_chunk_threads(15, 8) == 4
+    assert adaptive_chunk_threads(15, 12) == 6
+    assert adaptive_chunk_threads(9, 25) == 9
+
+
+def test_chunked_engine_preserves_explicit_chunk_size(tmp_path, monkeypatch):
+    input_path = tmp_path / "RC_2026-05.zst"
+    input_path.write_bytes(b"zstd fixture")
+    monkeypatch.setattr("engines.chunked_engine.shutil.which", lambda _path: "/usr/bin/tool")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["chunked_engine.py", str(input_path), "--chunk-size", "2750000"],
+    )
+
+    args = parse_arguments()
+
+    assert args.chunk_size == 2_750_000
+    assert args.chunk_size_source == "command line"
+
+
+def test_chunked_engine_automatically_sizes_chunks_from_memory(tmp_path, monkeypatch):
+    input_path = tmp_path / "RC_2026-05.zst"
+    input_path.write_bytes(b"zstd fixture")
+    monkeypatch.setattr("engines.chunked_engine.shutil.which", lambda _path: "/usr/bin/tool")
+    monkeypatch.setattr("engines.chunked_engine.ADAPTIVE_CHUNK_SIZE", True)
+    monkeypatch.setattr("engines.chunked_engine.DUCKDB_MEMORY_LIMIT_GB", 25)
+    monkeypatch.setattr("engines.chunked_engine.DUCKDB_THREADS", 15)
+    monkeypatch.setattr("engines.chunked_engine.TOTAL_RAM_GB", 16)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["chunked_engine.py", str(input_path)],
+    )
+
+    args = parse_arguments()
+
+    assert args.chunk_memory_limit_gb == 12
+    assert args.chunk_threads == 6
+    assert args.chunk_size == 3_000_000
+    assert args.spill_free_chunk_size == 3_000_000
+    assert args.chunk_size_source.startswith("adaptive")
+
+
+def test_resume_rejects_changed_adaptive_chunk_size(tmp_path):
+    (tmp_path / "chunk_00001.parquet").write_bytes(b"existing")
+    (tmp_path / "chunking.json").write_text('{"chunk_size": 2000000}', encoding="utf-8")
+
+    try:
+        _initialize_resume_state(str(tmp_path), 3_000_000)
+    except RuntimeError as exc:
+        assert "different chunk size" in str(exc)
+    else:
+        raise AssertionError("Expected changed chunk size to make resume fail")
 
 
 def test_chunked_engine_rejects_unsorted_chunks_with_final_merge(tmp_path, monkeypatch, capsys):

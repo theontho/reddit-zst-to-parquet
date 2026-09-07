@@ -107,6 +107,8 @@ This tool:
 - `engines/`: The DuckDB conversion scripts.
 - `docs/`:
     - [**ARCHITECTURE.md**](./docs/ARCHITECTURE.md): Deep dive into the system design.
+    - [BENCHMARKS.md](./docs/BENCHMARKS.md): Conversion-path and chunk-sizing benchmark results.
+    - [LESSONS_LEARNED.md](./docs/LESSONS_LEARNED.md): Benchmark-backed conversion and query-layout optimization guide.
     - [UNIFIED_SCHEMA.md](./docs/UNIFIED_SCHEMA.md): Documentation on the Parquet output schema.
 
 ## Requirements

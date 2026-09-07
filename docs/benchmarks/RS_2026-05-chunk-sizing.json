@@ -1,0 +1,188 @@
+{
+  "benchmark_date": "2026-09-07",
+  "source": {
+    "filename": "RS_2026-05.zst",
+    "compressed_bytes": 23823383434,
+    "uncompressed_bytes_approximate": 252329328640,
+    "sha256": "83f25791b1d7cf8663a5c5cea46d291924adf2e00ba02b450c564711725ffcef"
+  },
+  "environment": {
+    "machine": "Apple M1 Pro MacBook",
+    "memory_bytes": 34359738368,
+    "duckdb": "1.5.2",
+    "zstd": "1.5.7",
+    "parquet_compression": "ZSTD",
+    "sort": [
+      "author",
+      "subreddit",
+      "created_utc"
+    ]
+  },
+  "method": {
+    "sample": "First N rows in source order",
+    "source_order_preserved": true,
+    "fixed_raw_schema_columns": 156,
+    "fixed_raw_schema_sha256": "21665d23b81ba1ee59e1eb31832def13d1c4a8ad0534509071d23752b0461351",
+    "direct_schema_discovery_timed": false,
+    "spill_sample_interval_milliseconds": 10,
+    "validation": [
+      "row count",
+      "order-independent full-row content fingerprint",
+      "physical sort order"
+    ]
+  },
+  "high_memory_sweep": {
+    "configuration": {
+      "duckdb_memory_limit": "25GB",
+      "duckdb_threads": 9
+    },
+    "results": {
+      "250000": {
+        "repetitions": 1,
+        "median_seconds": 6.659301,
+        "median_rows_per_second": 37541.5,
+        "output_bytes": 155839681,
+        "median_peak_rss_bytes": 4554883072,
+        "median_peak_spill_bytes": 0
+      },
+      "500000": {
+        "repetitions": 3,
+        "median_seconds": 12.113234,
+        "median_rows_per_second": 41277.2,
+        "output_bytes": 307670978,
+        "median_peak_rss_bytes": 8953708544,
+        "median_peak_spill_bytes": 0
+      },
+      "750000": {
+        "repetitions": 3,
+        "median_seconds": 18.246867,
+        "median_rows_per_second": 41102.9,
+        "output_bytes": 463531974,
+        "median_peak_rss_bytes": 12970459136,
+        "median_peak_spill_bytes": 0
+      },
+      "1000000": {
+        "repetitions": 1,
+        "median_seconds": 27.616113,
+        "median_rows_per_second": 36210.7,
+        "output_bytes": 619877851,
+        "median_peak_rss_bytes": 12968706048,
+        "median_peak_spill_bytes": 0
+      },
+      "1500000": {
+        "repetitions": 3,
+        "median_seconds": 35.912882,
+        "median_rows_per_second": 41767.7,
+        "output_bytes": 929380586,
+        "median_peak_rss_bytes": 20070236160,
+        "median_peak_spill_bytes": 0
+      },
+      "2000000": {
+        "repetitions": 1,
+        "median_seconds": 56.762734,
+        "median_rows_per_second": 35234.4,
+        "output_bytes": 1228512121,
+        "median_peak_rss_bytes": 17921064960,
+        "median_peak_spill_bytes": 0
+      },
+      "3000000": {
+        "repetitions": 1,
+        "median_seconds": 90.517118,
+        "median_rows_per_second": 33142.9,
+        "output_bytes": 1835295408,
+        "median_peak_rss_bytes": 19560939520,
+        "median_peak_spill_bytes": 1370816512
+      }
+    }
+  },
+  "constrained_memory_sweep": {
+    "8GB": {
+      "duckdb_threads": 4,
+      "results": {
+        "250000": {
+          "repetitions": 3,
+          "median_seconds": 6.671201,
+          "median_rows_per_second": 37474.5,
+          "output_bytes": 155839226,
+          "median_peak_rss_bytes": 4624154624,
+          "median_peak_spill_bytes": 0
+        },
+        "500000": {
+          "repetitions": 1,
+          "conversion_seconds": 12.837578,
+          "rows_per_second": 38948.2,
+          "output_bytes": 307671094,
+          "peak_rss_bytes": 9189998592,
+          "peak_spill_bytes": 684949504
+        },
+        "750000": {
+          "repetitions": 1,
+          "conversion_seconds": 19.469321,
+          "rows_per_second": 38522.1,
+          "output_bytes": 463532242,
+          "peak_rss_bytes": 11447173120,
+          "peak_spill_bytes": 1841987584
+        },
+        "1000000": {
+          "repetitions": 1,
+          "conversion_seconds": 27.275117,
+          "rows_per_second": 36663.5,
+          "output_bytes": 619878987,
+          "peak_rss_bytes": 12470353920,
+          "peak_spill_bytes": 3066048528
+        }
+      }
+    },
+    "12GB": {
+      "duckdb_threads": 6,
+      "results": {
+        "500000": {
+          "repetitions": 3,
+          "median_seconds": 12.241352,
+          "median_rows_per_second": 40845.2,
+          "output_bytes": 307671094,
+          "median_peak_rss_bytes": 8824422400,
+          "median_peak_spill_bytes": 0
+        },
+        "750000": {
+          "repetitions": 1,
+          "conversion_seconds": 18.702216,
+          "rows_per_second": 40102.2,
+          "output_bytes": 463532242,
+          "peak_rss_bytes": 12377079808,
+          "peak_spill_bytes": 781156352
+        },
+        "1000000": {
+          "repetitions": 1,
+          "conversion_seconds": 24.1249,
+          "rows_per_second": 41450.9,
+          "output_bytes": 619878987,
+          "peak_rss_bytes": 15421341696,
+          "peak_spill_bytes": 1824456704
+        },
+        "1500000": {
+          "repetitions": 1,
+          "conversion_seconds": 41.646613,
+          "rows_per_second": 36017.3,
+          "output_bytes": 929380404,
+          "peak_rss_bytes": 17578967040,
+          "peak_spill_bytes": 4661784592
+        }
+      }
+    }
+  },
+  "validation": {
+    "all_row_counts_matched": true,
+    "all_repeated_content_fingerprints_matched": true,
+    "all_order_violation_counts": 0
+  },
+  "decision": {
+    "recommended_rows_by_effective_memory_gb": {
+      "8": 250000,
+      "12": 500000,
+      "25": 1500000
+    },
+    "formula": "max(250000, min(1500000, floor((memory_gb - 5) * 100000 / 250000) * 250000))",
+    "reason": "RS records are substantially wider than RC records. These values were spill-free at each tested profile; the 25GB cap produces an approximately 886 MiB file while retaining median throughput."
+  }
+}

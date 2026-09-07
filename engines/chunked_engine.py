@@ -22,6 +22,7 @@ from collections import defaultdict
 import duckdb
 
 from core.config import (
+    ADAPTIVE_CHUNK_SIZE,
     CHUNK_SIZE,
     COMPRESSION_RATIO_ESTIMATE,
     DUCKDB_MAXIMUM_OBJECT_SIZE,
@@ -29,9 +30,11 @@ from core.config import (
     DUCKDB_PARQUET_COMPRESSION_CODEC,
     DUCKDB_PATH,
     DUCKDB_PRESERVE_INSERTION_ORDER,
+    DUCKDB_RAM_USAGE_FACTOR,
     DUCKDB_ROW_GROUP_SIZE,
     DUCKDB_THREADS,
     TEST_RUN_CHUNK_SIZE,
+    TOTAL_RAM_GB,
     ZSTD_LONG_RANGE_BITS,
     ZSTD_PATH,
     ZSTD_TERMINATION_TIMEOUT_SECONDS,
@@ -40,6 +43,14 @@ from core.config import (
 # --- Constants ---
 DEFAULT_CHUNK_SIZE: int = CHUNK_SIZE
 DEFAULT_COMPRESSION_RATIO_ESTIMATE: int = COMPRESSION_RATIO_ESTIMATE
+COMMENT_ROWS_PER_MEMORY_GB = 250_000
+SUBMISSION_ROWS_PER_MEMORY_GB = 100_000
+SUBMISSION_MEMORY_OVERHEAD_GB = 5
+ADAPTIVE_CHUNK_GRANULARITY = 250_000
+MAX_COMMENT_CHUNK_SIZE = 6_000_000
+MIN_COMMENT_CHUNK_SIZE = 500_000
+MAX_SUBMISSION_CHUNK_SIZE = 1_500_000
+MIN_SUBMISSION_CHUNK_SIZE = 250_000
 
 # DuckDB type indicators for complex types (used for filtering)
 COMPLEX_TYPE_INDICATORS: list[str] = ["STRUCT", "MAP", "LIST", "[]"]
@@ -165,6 +176,62 @@ def format_size(size_bytes: int | None) -> str:
         return f"{size_bytes / 1024**2:.1f} MB"
     else:
         return f"{size_bytes / 1024**3:.1f} GB"
+
+
+def effective_duckdb_memory_limit_gb(
+    configured_limit_gb: int,
+    total_ram_gb: float = TOTAL_RAM_GB,
+    ram_usage_factor: float = DUCKDB_RAM_USAGE_FACTOR,
+) -> int:
+    """Caps DuckDB's configured limit to the host's safe RAM budget."""
+    system_budget_gb = max(1, int(total_ram_gb * ram_usage_factor))
+    return max(1, min(configured_limit_gb, system_budget_gb))
+
+
+def adaptive_chunk_size(input_path: str, memory_limit_gb: int) -> int:
+    """Returns a benchmark-calibrated chunk size intended to avoid sort spill."""
+    filename = os.path.basename(input_path).upper()
+    if filename.startswith("RC_"):
+        estimated_rows = memory_limit_gb * COMMENT_ROWS_PER_MEMORY_GB
+        min_chunk_size = MIN_COMMENT_CHUNK_SIZE
+        max_chunk_size = MAX_COMMENT_CHUNK_SIZE
+    else:
+        usable_memory_gb = max(0, memory_limit_gb - SUBMISSION_MEMORY_OVERHEAD_GB)
+        estimated_rows = usable_memory_gb * SUBMISSION_ROWS_PER_MEMORY_GB
+        min_chunk_size = MIN_SUBMISSION_CHUNK_SIZE
+        max_chunk_size = MAX_SUBMISSION_CHUNK_SIZE
+    rounded_rows = estimated_rows // ADAPTIVE_CHUNK_GRANULARITY * ADAPTIVE_CHUNK_GRANULARITY
+    return min(max_chunk_size, max(min_chunk_size, rounded_rows))
+
+
+def adaptive_chunk_threads(configured_threads: int, memory_limit_gb: int) -> int:
+    """Caps worker threads so low-memory hosts retain per-thread headroom."""
+    return max(1, min(configured_threads, memory_limit_gb // 2))
+
+
+def configure_chunk_resources(args: argparse.Namespace) -> None:
+    """Selects safe chunk resources while preserving explicit CLI overrides."""
+    args.chunk_memory_limit_gb = effective_duckdb_memory_limit_gb(
+        DUCKDB_MEMORY_LIMIT_GB,
+        total_ram_gb=TOTAL_RAM_GB,
+        ram_usage_factor=DUCKDB_RAM_USAGE_FACTOR,
+    )
+    args.chunk_threads = adaptive_chunk_threads(DUCKDB_THREADS, args.chunk_memory_limit_gb)
+    args.spill_free_chunk_size = adaptive_chunk_size(args.input_path[0], args.chunk_memory_limit_gb)
+
+    if args.test_run:
+        args.chunk_size = TEST_RUN_CHUNK_SIZE
+        args.chunk_size_source = "test-run"
+    elif args.chunk_size is not None:
+        args.chunk_size_source = "command line"
+    elif ADAPTIVE_CHUNK_SIZE:
+        args.chunk_size = args.spill_free_chunk_size
+        args.chunk_size_source = (
+            f"adaptive ({args.chunk_memory_limit_gb} GB effective DuckDB memory from {TOTAL_RAM_GB:.1f} GiB system RAM)"
+        )
+    else:
+        args.chunk_size = DEFAULT_CHUNK_SIZE
+        args.chunk_size_source = "configuration"
 
 
 def find_schema_for_file(zst_path: str):
@@ -781,10 +848,11 @@ def parse_arguments() -> argparse.Namespace:
     # ...
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging output.")
     parser.add_argument(
+        "--chunk-size",
         "--chunk_size",
         type=int,
-        default=DEFAULT_CHUNK_SIZE,
-        help=f"Number of lines per processing chunk (default: {DEFAULT_CHUNK_SIZE:,})",
+        default=None,
+        help="Explicit number of rows per processing chunk (default: derive from memory)",
     )
     parser.add_argument(
         "--duckdb_path", default=DUCKDB_PATH, help=f"Path to the duckdb executable (default: '{DUCKDB_PATH}')"
@@ -844,13 +912,13 @@ def parse_arguments() -> argparse.Namespace:
         parser.error("--merge-threads must be at least 1.")
     if args.merge_memory_limit_gb is not None and args.merge_memory_limit_gb < 1:
         parser.error("--merge-memory-limit-gb must be at least 1.")
+    if args.chunk_size is not None and args.chunk_size < 1:
+        parser.error("--chunk-size must be at least 1.")
     if args.skip_chunk_sort and not args.no_merge:
         parser.error("--skip-chunk-sort requires --no-merge; unsorted chunks make the final global sort less reliable.")
 
     # --- Mode-specific Validation ---
     is_zst_conversion_mode = not args.analyze_schemas and not args.merge_only
-    input_file_for_logic = args.input_path[0] if args.input_path else None  # Get first input for logic checks
-
     if args.analyze_schemas:
         # Analyze Schemas Mode Validation
         # Input can now be a glob pattern, validation moved to analyze_parquet_schemas
@@ -876,8 +944,8 @@ def parse_arguments() -> argparse.Namespace:
             parser.error("--output is required when using --merge-only.")
         # Input can now be a glob pattern, validation moved to handle_merge_only_mode
         # Ensure test_run logic isn't accidentally triggered later
-        if args.chunk_size != DEFAULT_CHUNK_SIZE:
-            logging.warning("Warning: --chunk_size is ignored in --merge-only mode.")
+        if args.chunk_size is not None:
+            logging.warning("Warning: --chunk-size is ignored in --merge-only mode.")
         args.test_run = False  # Explicitly disable test run in merge-only
     else:
         # ZST conversion mode validation
@@ -910,31 +978,8 @@ def parse_arguments() -> argparse.Namespace:
     ):  # Only check zstd if not merge/analyze
         parser.error(f"Cannot find zstd executable at '{args.zstd_path}'. Use --zstd_path or ensure it's in PATH.")
 
-    # --- Adjust Chunk Size Based on Input Filename (RC vs RS) ---
-    # Apply only in ZST conversion mode and NOT during a test run
-    if is_zst_conversion_mode and not args.test_run and input_file_for_logic:
-        input_filename_lower = os.path.basename(input_file_for_logic).lower()
-        # Assuming 'RC' indicates comments (larger chunks) and 'RS' indicates submissions (default chunks)
-        # Using 'rc' check to be broader, adjust if needed
-        if "rc" in input_filename_lower:
-            original_chunk_size = args.chunk_size
-            args.chunk_size *= 4
-            # Use logging AFTER setup_logging is called, so log this info later or print for now
-            print(
-                f"Info: Input filename suggests 'RC' data. Increasing chunk size 4x from {original_chunk_size:,} to {args.chunk_size:,}."
-            )
-            # logging.info(f"Input filename suggests 'RC' data. Increasing chunk size 4x from {original_chunk_size:,} to {args.chunk_size:,}.")
-
-    # --- Adjustments for Test Run (AFTER potential RC multiplier) ---
-    if args.test_run:
-        # Store the potentially multiplied chunk size before overriding for test run
-        original_chunk_size = args.chunk_size  # This might be 4x the default if it was an RC file
-        args.chunk_size = TEST_RUN_CHUNK_SIZE  # Use constant
-        logging.info("--- TEST RUN MODE ---")
-        # Log the size it was *before* being set to TEST_RUN_CHUNK_SIZE
-        logging.info(f"Overriding chunk size from {original_chunk_size:,} to {args.chunk_size:,}")
-        logging.info("Will process at most 2 chunks.")
-        logging.info("Temporary files will be kept.")
+    if is_zst_conversion_mode:
+        configure_chunk_resources(args)
 
     return args
 
@@ -1002,6 +1047,22 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
     logging.info("--- Running in ZST-to-Parquet Mode ---")
     input_zst_path = args.input_path[0]
     output_parquet_path = args.output_path  # Already determined
+    logging.info(
+        "Chunk resources: rows=%s (%s), threads=%s, memory_limit=%sGB",
+        f"{args.chunk_size:,}",
+        args.chunk_size_source,
+        args.chunk_threads,
+        args.chunk_memory_limit_gb,
+    )
+    if args.chunk_size > args.spill_free_chunk_size:
+        logging.warning(
+            "Explicit chunk size %s exceeds the spill-avoiding estimate %s for this resource profile.",
+            f"{args.chunk_size:,}",
+            f"{args.spill_free_chunk_size:,}",
+        )
+    if args.test_run:
+        logging.info("--- TEST RUN MODE ---")
+        logging.info("Will process at most 2 chunks and keep temporary files.")
 
     # Estimate total size for progress reporting
     estimated_decompressed_size = _estimate_decompressed_size(input_zst_path)
@@ -1250,12 +1311,30 @@ def _initialize_resume_state(temp_dir_path: str, chunk_size: int) -> tuple[int, 
     """
     logging.info(f"Checking for existing chunks in {temp_dir_path}...")
     existing_parquet_files = sorted(glob.glob(os.path.join(temp_dir_path, "chunk_*.parquet")))
+    settings_path = os.path.join(temp_dir_path, "chunking.json")
     chunk_numbers_found = set()
     max_chunk_num = 0
 
     if not existing_parquet_files:
+        with open(settings_path, "w", encoding="utf-8") as settings_file:
+            json.dump({"chunk_size": chunk_size}, settings_file, indent=2)
         logging.info("No existing Parquet chunks found. Starting fresh.")
         return 1, 0, []
+
+    if os.path.exists(settings_path):
+        with open(settings_path, encoding="utf-8") as settings_file:
+            previous_chunk_size = json.load(settings_file).get("chunk_size")
+        if previous_chunk_size != chunk_size:
+            raise RuntimeError(
+                "Existing chunks use a different chunk size "
+                f"({previous_chunk_size!r} instead of {chunk_size}); use the original "
+                "resource settings or a new temporary directory."
+            )
+    else:
+        logging.warning(
+            "Existing chunks predate chunk-size metadata; assuming they use the current %s-row size.",
+            f"{chunk_size:,}",
+        )
 
     for f in existing_parquet_files:
         match = re.search(r"chunk_(\d+)\.parquet$", os.path.basename(f))
@@ -1402,7 +1481,7 @@ def _process_chunk(
             # but for single introspection it's fine.
             with duckdb.connect(":memory:") as con:  # Use context manager
                 con.execute("SET threads=1;")  # Keep introspection to 1 thread to avoid overhead
-                con.execute(f"SET memory_limit='{DUCKDB_MEMORY_LIMIT_GB}GB';")
+                con.execute(f"SET memory_limit='{args.chunk_memory_limit_gb}GB';")
                 # Get schema from the JSONL chunk
                 # Using LIMIT 0 makes describe faster as it only needs schema
                 # Use SQL quoting for the filename
@@ -1488,12 +1567,21 @@ def _process_chunk(
 
                 # Build the final COPY command
                 temp_parquet_filename_sql = quote_sql_string(temp_parquet_filename)
+                chunk_spill_directory = os.path.abspath(os.path.join(temp_dir_path, "duckdb-spill"))
+                os.makedirs(chunk_spill_directory, exist_ok=True)
+                available_temp_bytes = shutil.disk_usage(temp_dir_path).free
+                max_temp_bytes = max(1, int(available_temp_bytes * 0.75))
                 chunk_order_clause = (
                     "ORDER BY author ASC, subreddit ASC, created_utc ASC"
                     if args.no_merge and not args.skip_chunk_sort
                     else ""
                 )
                 duckdb_query = f"""
+                SET threads={args.chunk_threads};
+                SET memory_limit='{args.chunk_memory_limit_gb}GB';
+                SET temp_directory={quote_sql_string(chunk_spill_directory)};
+                SET max_temp_directory_size='{max_temp_bytes}B';
+                SET preserve_insertion_order={"true" if DUCKDB_PRESERVE_INSERTION_ORDER else "false"};
                 COPY (
                     SELECT {select_clause}
                     FROM read_json({temp_jsonl_filename_sql},

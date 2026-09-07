@@ -44,6 +44,7 @@ config_data: dict[str, Any] = {
         "enable_terminal_title_update": True,
         "log_file": "conversion_log.json",
         "chunk_size": 1000000,
+        "adaptive_chunk_size": True,
         "test_run_chunk_size": 10000,
         "compression_ratio_estimate": 16,
         "conversion_method": "chunked",  # "chunked" is recommended for stability. "streamed" is faster but prone to OOM on large files.
@@ -192,5 +193,6 @@ ZSTD_TERMINATION_TIMEOUT_SECONDS = config_data["zstd"]["termination_timeout_seco
 
 # --- Pipeline Config ---
 CHUNK_SIZE = config_data["pipeline"]["chunk_size"]
+ADAPTIVE_CHUNK_SIZE = config_data["pipeline"]["adaptive_chunk_size"]
 TEST_RUN_CHUNK_SIZE = config_data["pipeline"]["test_run_chunk_size"]
 COMPRESSION_RATIO_ESTIMATE = config_data["pipeline"]["compression_ratio_estimate"]

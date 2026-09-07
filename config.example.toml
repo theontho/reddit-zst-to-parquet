@@ -34,8 +34,11 @@ nfs_mount_path = "~/qnap"
 max_consecutive_failures = 6
 enable_terminal_title_update = true
 log_file = "conversion_log.json"
-# Number of lines per processing chunk
+# Manual number of lines per processing chunk when adaptive_chunk_size is false.
 chunk_size = 1000000
+# Derive a spill-avoiding chunk size from the effective DuckDB memory limit.
+# A --chunk-size CLI value always overrides this setting.
+adaptive_chunk_size = true
 # Number of lines for a test run
 test_run_chunk_size = 10000
 # Estimated compression ratio for progress calculations
@@ -74,4 +77,3 @@ large_file_threshold_gb = 1.0
 long_range_bits = 31
 # Seconds to wait for zstd to terminate before killing it
 termination_timeout_seconds = 5
-

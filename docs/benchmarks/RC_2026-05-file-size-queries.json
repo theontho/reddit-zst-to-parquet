@@ -1,0 +1,149 @@
+{
+  "benchmark_date": "2026-09-06",
+  "source": {
+    "filename": "RC_2026-05.zst",
+    "rows": 349577451,
+    "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc"
+  },
+  "method": {
+    "repetitions": 5,
+    "warmups_per_layout": 1,
+    "fresh_connection_per_query": true,
+    "layout_order_rotated": true,
+    "all_query_results_equal": true,
+    "full_rows_definition": "count plus bit_xor(hash(row))"
+  },
+  "layouts": {
+    "merged": {"files": 1, "bytes": 46771953794},
+    "2m": {"files": 175, "bytes": 54542682750},
+    "4m": {"files": 88, "bytes": 53612379234},
+    "6m": {"files": 59, "bytes": 53100958500},
+    "8m": {"files": 44, "bytes": 52663875806}
+  },
+  "median_seconds": {
+    "rare_subreddit_count": {
+      "rows": 100,
+      "merged": 0.156709,
+      "2m": 1.114949,
+      "4m": 0.947436,
+      "6m": 0.784226,
+      "8m": 0.642639
+    },
+    "rare_subreddit_full_rows": {
+      "rows": 100,
+      "merged": 0.820830,
+      "2m": 1.978006,
+      "4m": 1.815772,
+      "6m": 1.601333,
+      "8m": 1.443937
+    },
+    "medium_subreddit_count": {
+      "rows": 9998,
+      "merged": 0.371961,
+      "2m": 1.154496,
+      "4m": 1.012737,
+      "6m": 0.904226,
+      "8m": 0.808256
+    },
+    "medium_subreddit_full_rows": {
+      "rows": 9998,
+      "merged": 20.093976,
+      "2m": 31.669383,
+      "4m": 27.646234,
+      "6m": 28.266139,
+      "8m": 30.292302
+    },
+    "large_subreddit_count": {
+      "rows": 100083,
+      "merged": 0.744118,
+      "2m": 1.351860,
+      "4m": 1.259130,
+      "6m": 1.133416,
+      "8m": 1.054870
+    },
+    "large_subreddit_full_rows": {
+      "rows": 100083,
+      "merged": 31.889659,
+      "2m": 42.214690,
+      "4m": 41.189220,
+      "6m": 41.225875,
+      "8m": 39.766459
+    },
+    "popular_subreddit_count": {
+      "rows": 3827403,
+      "merged": 0.802861,
+      "2m": 1.577839,
+      "4m": 1.453648,
+      "6m": 1.299879,
+      "8m": 1.187338
+    },
+    "popular_subreddit_full_rows": {
+      "rows": 3827403,
+      "merged": 36.507709,
+      "2m": 42.729842,
+      "4m": 41.433699,
+      "6m": 41.425310,
+      "8m": 40.369027
+    },
+    "rare_author_count": {
+      "rows": 14,
+      "merged": 0.145168,
+      "2m": 0.111552,
+      "4m": 0.066224,
+      "6m": 0.057315,
+      "8m": 0.049130
+    },
+    "rare_author_full_rows": {
+      "rows": 14,
+      "merged": 0.430542,
+      "2m": 0.404728,
+      "4m": 0.354863,
+      "6m": 0.349157,
+      "8m": 0.333100
+    },
+    "active_author_full_rows": {
+      "rows": 2000,
+      "merged": 0.403923,
+      "2m": 0.663771,
+      "4m": 0.481065,
+      "6m": 0.430303,
+      "8m": 0.409814
+    },
+    "author_subreddit_full_rows": {
+      "rows": 6,
+      "merged": 0.422014,
+      "2m": 0.371701,
+      "4m": 0.332046,
+      "6m": 0.297250,
+      "8m": 0.306955
+    },
+    "one_day_count": {
+      "rows": 11168982,
+      "merged": 0.648502,
+      "2m": 0.059855,
+      "4m": 0.066410,
+      "6m": 0.065218,
+      "8m": 0.075584
+    },
+    "one_day_full_rows": {
+      "rows": 11168982,
+      "merged": 37.480273,
+      "2m": 2.146354,
+      "4m": 2.540113,
+      "6m": 2.720757,
+      "8m": 3.339924
+    }
+  },
+  "subreddit_samples": {
+    "rare": "SkatingAdvice",
+    "medium": "ultrawidemasterrace",
+    "large": "chile",
+    "popular": "AskReddit"
+  },
+  "decision": {
+    "balanced_rows_per_file": 6000000,
+    "balanced_average_file_bytes": 900016246,
+    "author_and_count_optimized_rows_per_file": 8000000,
+    "time_range_optimized_rows_per_file": 2000000
+  }
+}
