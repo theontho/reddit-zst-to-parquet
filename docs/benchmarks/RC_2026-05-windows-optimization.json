@@ -5,6 +5,15 @@
     "bytes": 47844685635,
     "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc"
   },
+  "reproduction": {
+    "harness": "benchmarks/conversion.py",
+    "instructions": "benchmarks/README.md",
+    "rows": 4000000,
+    "repetitions": 3,
+    "warmups": 0,
+    "memory_limit_gb": 25,
+    "copy_mode": "block"
+  },
   "machines": {
     "mac": {
       "cpu": "Apple M1 Pro",

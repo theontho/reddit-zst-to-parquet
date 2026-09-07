@@ -105,6 +105,8 @@ This tool:
 - `commands/`: Subcommand implementations.
 - `transfer/`: Handlers for different protocols (FTP, Rsync, NFS, Local).
 - `engines/`: The DuckDB conversion scripts.
+- `benchmarks/`: Portable, validated Mac/Linux/Windows conversion benchmark
+  harness and [reproduction commands](./benchmarks/README.md).
 - `docs/`:
     - [**ARCHITECTURE.md**](./docs/ARCHITECTURE.md): Deep dive into the system design.
     - [BENCHMARKS.md](./docs/BENCHMARKS.md): Conversion-path and chunk-sizing benchmark results.

@@ -8,6 +8,10 @@ and
 [`docs/benchmarks/RS_2026-05-chunk-sizing.json`](benchmarks/RS_2026-05-chunk-sizing.json).
 The cross-platform Windows optimization results are in
 [`docs/benchmarks/RC_2026-05-windows-optimization.json`](benchmarks/RC_2026-05-windows-optimization.json).
+Use the tracked [`benchmarks.conversion`](../benchmarks/README.md) harness to
+rerun the staged or direct conversion paths on macOS, Windows, or Linux. It
+captures environment metadata and validates source hashes, row counts,
+schemas, full-row fingerprints, and physical sort order.
 
 ## September 2026 chunk-sizing benchmark
 
