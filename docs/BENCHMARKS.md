@@ -6,6 +6,8 @@ tracked; the compact raw results are in
 [`docs/benchmarks/RC_2026-05-chunk-sizing.json`](benchmarks/RC_2026-05-chunk-sizing.json)
 and
 [`docs/benchmarks/RS_2026-05-chunk-sizing.json`](benchmarks/RS_2026-05-chunk-sizing.json).
+The cross-platform Windows optimization results are in
+[`docs/benchmarks/RC_2026-05-windows-optimization.json`](benchmarks/RC_2026-05-windows-optimization.json).
 
 ## September 2026 chunk-sizing benchmark
 
@@ -54,6 +56,74 @@ separate operations.
 The sorted direct output was 601,763,427 bytes versus 674,975,210 bytes for the
 unsorted output, a 10.85% reduction. Better compression made direct sorted
 output faster than direct unsorted output despite the sort work.
+
+### Windows block-streaming optimization
+
+A matched legacy run on the Ryzen 3 PRO 5350GE Windows node took 12,873 seconds
+to produce the same 88 four-million-row chunks that the M1 Pro produced in
+3,699 seconds. Windows chunking was 3.48x slower even though the independent
+hardware suite measured much smaller gaps:
+
+| Independent benchmark | Mac/Windows speed ratio |
+|---|---:|
+| Geekbench 7 single-core | 1.14x |
+| Geekbench 7 multi-core | 1.76x |
+| fio sequential read | 1.82x |
+| fio sequential write | 1.91x |
+| 7-Zip compression | 1.54x |
+
+The legacy converter decoded every row into a Python string, retained four
+million strings at once, and wrote them through a Windows text stream before
+DuckDB read them again. A later line-streaming implementation removed the
+list, but still performed four million Python read/decode/encode/write cycles.
+On Windows, staging the first 4M rows that way took 33.10 seconds.
+
+The optimized implementation keeps the Zstandard subprocess in binary mode and
+copies 8 MiB blocks. It counts newlines in C-backed byte operations and retains
+only the bytes after a chunk boundary. The same staging operation fell to
+12.24 seconds, a **2.70x improvement**, while preserving exact source bytes.
+
+The complete staged, normalized, author-sorted 4M conversion used four DuckDB
+threads on Windows and nine on the Mac:
+
+| Machine/path | Repetitions | Median stage | Median Parquet | Median total | Throughput |
+|---|---:|---:|---:|---:|---:|
+| M1 Pro, binary blocks | 3 | 7.41 s | 8.10 s | 15.51 s | 257,832 rows/s |
+| Ryzen 5350GE, text lines | 1 | 33.10 s | 22.43 s | 55.53 s | 72,034 rows/s |
+| **Ryzen 5350GE, binary blocks** | **3** | **12.24 s** | **22.27 s** | **34.48 s** | **115,997 rows/s** |
+
+Disabling Defender real-time, behavior, IOAV, and script scanning did not
+improve this path. Three otherwise identical Windows runs had a median of
+35.79 seconds and 111,768 rows/s, 3.78% slower than the 34.48-second
+Defender-on median and within ordinary run variance. The Defender antivirus
+engine and service remained loaded, while real-time and on-access scanning
+were verified inactive. All runs produced the same 4M-row content fingerprint.
+
+Binary block streaming makes the optimized Windows path 2.22x slower than the
+optimized Mac path instead of 3.48x slower than the historical Mac baseline.
+The staging ratio is 1.65x, within the independent storage/compression range.
+The remaining 2.75x Parquet-phase gap is dominated by JSON parsing, sorting,
+memory traffic, and compression on a four-core DDR4 system rather than NVMe
+throughput.
+
+Four DuckDB threads were marginally best on the four-core/eight-thread Ryzen:
+34.48 seconds versus 37.51 seconds with seven threads and 34.88 seconds with
+eight. The engine therefore caps chunk workers at physical cores as well as
+the memory-derived limit. High performance versus Balanced power plans made no
+measurable difference (34.58 versus 34.48 seconds), so Balanced was restored.
+
+The 4M Windows result was slightly faster per row than 2M and 6M:
+
+| Rows | Total | Throughput |
+|---:|---:|---:|
+| 2M | 17.47 s | 114,452 rows/s |
+| **4M** | **34.48 s** | **115,997 rows/s** |
+| 6M | 53.93 s | 111,260 rows/s |
+
+These differences are small enough that memory and query-layout requirements
+remain the primary chunk-size criteria. The key Windows optimization is binary
+block staging, not a platform-specific chunk size, power plan, or weakened
+antivirus protection.
 
 ### Scaling from two to eight million rows
 

@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from collections import defaultdict
 
 import duckdb
+import psutil
 
 from core.config import (
     ADAPTIVE_CHUNK_SIZE,
@@ -51,6 +52,7 @@ MAX_COMMENT_CHUNK_SIZE = 6_000_000
 MIN_COMMENT_CHUNK_SIZE = 500_000
 MAX_SUBMISSION_CHUNK_SIZE = 1_500_000
 MIN_SUBMISSION_CHUNK_SIZE = 250_000
+STREAM_BLOCK_SIZE = 8 * 1024 * 1024
 
 # DuckDB type indicators for complex types (used for filtering)
 COMPLEX_TYPE_INDICATORS: list[str] = ["STRUCT", "MAP", "LIST", "[]"]
@@ -204,9 +206,15 @@ def adaptive_chunk_size(input_path: str, memory_limit_gb: int) -> int:
     return min(max_chunk_size, max(min_chunk_size, rounded_rows))
 
 
-def adaptive_chunk_threads(configured_threads: int, memory_limit_gb: int) -> int:
-    """Caps worker threads so low-memory hosts retain per-thread headroom."""
-    return max(1, min(configured_threads, memory_limit_gb // 2))
+def adaptive_chunk_threads(
+    configured_threads: int,
+    memory_limit_gb: int,
+    physical_cores: int | None = None,
+) -> int:
+    """Caps workers by physical cores and memory rather than SMT thread count."""
+    if physical_cores is None:
+        physical_cores = psutil.cpu_count(logical=False) or os.cpu_count() or 1
+    return max(1, min(configured_threads, physical_cores, memory_limit_gb // 2))
 
 
 def configure_chunk_resources(args: argparse.Namespace) -> None:
@@ -1106,9 +1114,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         if args.verbose:
             logging.debug(f"Starting decompression command: {' '.join(zstd_cmd)}")
         try:
-            zstd_proc = subprocess.Popen(
-                zstd_cmd, stdout=subprocess.PIPE, text=True, errors="replace", encoding="utf-8"
-            )
+            zstd_proc = subprocess.Popen(zstd_cmd, stdout=subprocess.PIPE, bufsize=STREAM_BLOCK_SIZE)
         except FileNotFoundError:
             logging.error(f"Error: Failed to start zstd process. Command not found at '{args.zstd_path}'.")
             sys.exit(1)
@@ -1119,20 +1125,13 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
         if zstd_proc.stdout is None:
             logging.error("Error: Could not get stdout from zstd process.")
             sys.exit(1)
+        chunk_reader = BinaryLineChunker(zstd_proc.stdout)
 
         # --- Skip Lines for Resume ---
         if lines_to_skip > 0:
             logging.info(f"Skipping {lines_to_skip:,} lines...")
-            skipped_count = 0
             try:
-                for _ in range(lines_to_skip):
-                    line = zstd_proc.stdout.readline()
-                    if not line:
-                        logging.warning(
-                            f"Warning: End of stream reached while skipping lines after {skipped_count} lines (expected {lines_to_skip})."
-                        )
-                        break
-                    skipped_count += 1
+                skipped_count = chunk_reader.skip_lines(lines_to_skip)
                 line_count = skipped_count  # Update line count to reflect skipped lines
                 logging.info(f"Skipped {line_count:,} lines successfully.")
             except Exception as e:
@@ -1157,8 +1156,7 @@ def handle_zst_to_parquet_mode(args: argparse.Namespace) -> None:
             temp_jsonl_filename = os.path.join(temp_dir_path, f"chunk_{chunk_num:05d}.jsonl")
 
             try:
-                chunk_line_count = _write_jsonl_chunk(
-                    zstd_proc.stdout,
+                chunk_line_count = chunk_reader.write_chunk(
                     temp_jsonl_filename,
                     args.chunk_size,
                 )
@@ -1410,27 +1408,67 @@ def _setup_temp_directory(temp_dir_base: str | None, output_path: str) -> str | 
         return None
 
 
-def _write_jsonl_chunk(source: IO[str], output_path: str, max_lines: int) -> int:
-    """Streams at most max_lines from source to a JSONL chunk without buffering them in memory."""
-    lines_written = 0
-    try:
-        with open(output_path, "w", encoding="utf-8") as output:
-            for _ in range(max_lines):
-                line = source.readline()
-                if not line:
-                    break
-                output.write(line)
-                lines_written += 1
-    except Exception:
-        if os.path.exists(output_path):
+class BinaryLineChunker:
+    """Copies line-bounded chunks with block I/O and a small carry buffer."""
+
+    def __init__(self, source: IO[bytes], block_size: int = STREAM_BLOCK_SIZE):
+        if block_size < 1:
+            raise ValueError("block_size must be positive")
+        self.source = source
+        self.block_size = block_size
+        self.pending = b""
+
+    def _consume(self, max_lines: int, output: IO[bytes] | None) -> int:
+        lines_consumed = 0
+        last_byte: int | None = None
+
+        while lines_consumed < max_lines:
+            data = self.pending
+            self.pending = b""
+            if not data:
+                data = self.source.read(self.block_size)
+            if not data:
+                if last_byte is not None and last_byte != ord("\n"):
+                    lines_consumed += 1
+                break
+
+            needed = max_lines - lines_consumed
+            newline_count = data.count(b"\n")
+            if newline_count < needed:
+                if output is not None:
+                    output.write(data)
+                lines_consumed += newline_count
+                last_byte = data[-1]
+                continue
+
+            end = 0
+            for _ in range(needed):
+                end = data.find(b"\n", end) + 1
+            if output is not None:
+                output.write(data[:end])
+            self.pending = data[end:]
+            lines_consumed = max_lines
+
+        return lines_consumed
+
+    def skip_lines(self, max_lines: int) -> int:
+        """Discards at most max_lines while retaining bytes after the boundary."""
+        return self._consume(max_lines, None)
+
+    def write_chunk(self, output_path: str, max_lines: int) -> int:
+        """Writes at most max_lines without decoding or retaining whole rows."""
+        try:
+            with open(output_path, "wb", buffering=STREAM_BLOCK_SIZE) as output:
+                lines_written = self._consume(max_lines, output)
+        except Exception:
             with contextlib.suppress(OSError):
                 os.remove(output_path)
-        raise
+            raise
 
-    if lines_written == 0:
-        with contextlib.suppress(OSError):
-            os.remove(output_path)
-    return lines_written
+        if lines_written == 0:
+            with contextlib.suppress(OSError):
+                os.remove(output_path)
+        return lines_written
 
 
 def _process_chunk(

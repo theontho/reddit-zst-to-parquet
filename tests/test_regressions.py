@@ -1,7 +1,7 @@
 import copy
-import io
 import subprocess
 import sys
+from io import BytesIO
 from typing import cast
 
 import pyarrow as pa
@@ -12,9 +12,9 @@ from core import config
 from core.converter import convert_to_parquet
 from core.processor import get_files_to_process, process_file
 from engines.chunked_engine import (
+    BinaryLineChunker,
     _initialize_resume_state,
     _parquet_metadata_row_count,
-    _write_jsonl_chunk,
     adaptive_chunk_size,
     adaptive_chunk_threads,
     effective_duckdb_memory_limit_gb,
@@ -33,11 +33,22 @@ def test_chunked_engine_loads_packaged_master_schema():
 
 def test_write_jsonl_chunk_streams_bounded_lines(tmp_path):
     output_path = tmp_path / "chunk.jsonl"
-    source = io.StringIO('{"id": 1}\n{"id": 2}\n{"id": 3}\n')
+    source = BytesIO(b'{"id": 1}\n{"id": 2}\n{"id": 3}')
+    chunker = BinaryLineChunker(source, block_size=7)
 
-    assert _write_jsonl_chunk(source, str(output_path), 2) == 2
+    assert chunker.write_chunk(str(output_path), 2) == 2
     assert output_path.read_text(encoding="utf-8") == '{"id": 1}\n{"id": 2}\n'
-    assert source.readline() == '{"id": 3}\n'
+    assert chunker.write_chunk(str(output_path), 2) == 1
+    assert output_path.read_text(encoding="utf-8") == '{"id": 3}'
+
+
+def test_binary_line_chunker_skips_without_losing_buffered_bytes(tmp_path):
+    output_path = tmp_path / "chunk.jsonl"
+    chunker = BinaryLineChunker(BytesIO(b"one\ntwo\nthree\nfour\n"), block_size=11)
+
+    assert chunker.skip_lines(2) == 2
+    assert chunker.write_chunk(str(output_path), 2) == 2
+    assert output_path.read_bytes() == b"three\nfour\n"
 
 
 def test_parquet_metadata_row_count_sums_files(tmp_path):
@@ -93,9 +104,10 @@ def test_adaptive_chunk_size_uses_measured_submission_memory_curve():
 
 
 def test_adaptive_chunk_threads_retains_memory_headroom():
-    assert adaptive_chunk_threads(15, 8) == 4
-    assert adaptive_chunk_threads(15, 12) == 6
-    assert adaptive_chunk_threads(9, 25) == 9
+    assert adaptive_chunk_threads(15, 8, physical_cores=10) == 4
+    assert adaptive_chunk_threads(15, 12, physical_cores=10) == 6
+    assert adaptive_chunk_threads(9, 25, physical_cores=10) == 9
+    assert adaptive_chunk_threads(7, 25, physical_cores=4) == 4
 
 
 def test_chunked_engine_preserves_explicit_chunk_size(tmp_path, monkeypatch):

@@ -51,6 +51,18 @@ buffering became progressively slower as chunk size increased and raised the
 process working set. Keep row parsing, normalization, sorting, and Parquet
 encoding inside DuckDB.
 
+When an intermediate JSONL chunk is still required for resumability, keep the
+Zstandard subprocess in binary mode and copy large blocks rather than decoding
+and re-encoding one line at a time. On the tested Windows node, staging 4M rows
+fell from 33.10 seconds with Python text-line iteration to 12.24 seconds with
+8 MiB binary blocks. The full staged conversion fell to 34.48 seconds per 4M
+rows, 3.9x faster than the historical 146-second average.
+
+Do not disable Defender to optimize this conversion. With real-time, behavior,
+IOAV, and script scanning disabled, the same Windows benchmark took a median
+35.79 seconds versus 34.48 seconds with protection enabled. The structural
+binary-streaming change, not antivirus configuration, produced the speedup.
+
 DuckDB 1.5.2 successfully read the tested long-range-compressed Zstandard file
 directly. Older DuckDB versions previously required the system `zstd` decoder
 and a FIFO, so direct decoding must remain covered by a real conversion smoke
@@ -130,7 +142,10 @@ against memory and retry cost. A 3M chunk spilled 1.28 GiB and was 20.7% slower
 per row. At 8 GB and 12 GB, increasing one step beyond the selected default
 caused measurable spill.
 
-DuckDB threads are capped at one thread per 2 GB of effective memory. An
+DuckDB threads are capped at the lower of the configured value, physical CPU
+cores, and one thread per 2 GB of effective memory. Hyperthreads did not improve
+the measured Windows conversion: four threads completed a 4M chunk in 34.48
+seconds, versus 37.51 seconds at seven threads and 34.88 seconds at eight. An
 explicit `--chunk-size` overrides automatic sizing and logs a warning when it
 exceeds the spill-avoiding estimate. Set `pipeline.adaptive_chunk_size = false`
 to use the configured `pipeline.chunk_size` instead.
@@ -273,12 +288,13 @@ allowance as permanent dataset storage.
 Apply optimizations in this order:
 
 1. Remove Python row buffering.
-2. Read the source once with a fixed schema.
-3. Sort while writing each bounded chunk.
-4. Eliminate the default global merge.
-5. Tune chunk size for the actual query workload.
-6. Tune memory and threads for the host, allowing spill as a safety valve.
-7. Add a derivative physical layout only for a proven secondary access pattern.
+2. Replace per-line text transcoding with large binary stream copies.
+3. Read the source once with a fixed schema.
+4. Sort while writing each bounded chunk.
+5. Eliminate the default global merge.
+6. Tune chunk size for the actual query workload.
+7. Tune memory and threads for the host, allowing spill as a safety valve.
+8. Add a derivative physical layout only for a proven secondary access pattern.
 
 This ordering targets structural costs first. Increasing threads, memory, or
 chunk size cannot compensate for repeated decompression, Python object

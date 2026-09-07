@@ -1,0 +1,169 @@
+{
+  "benchmark_date": "2026-09-07",
+  "source": {
+    "filename": "RC_2026-05.zst",
+    "bytes": 47844685635,
+    "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc"
+  },
+  "machines": {
+    "mac": {
+      "cpu": "Apple M1 Pro",
+      "physical_cores": 10,
+      "memory_bytes": 34359738368,
+      "storage": "Apple SSD AP2048R NVMe"
+    },
+    "windows": {
+      "cpu": "AMD Ryzen 3 PRO 5350GE",
+      "physical_cores": 4,
+      "logical_processors": 8,
+      "memory_bytes": 33695272960,
+      "storage": "SK hynix SHGP31-1000GM-2 NVMe",
+      "power_plan_during_selected_runs": "Balanced",
+      "defender_real_time_protection_during_baseline": true
+    }
+  },
+  "independent_benchmark_mac_to_windows_ratios": {
+    "geekbench_7_single_core": 1.1364,
+    "geekbench_7_multi_core": 1.7609,
+    "fio_sequential_read": 1.8209,
+    "fio_sequential_write": 1.9122,
+    "seven_zip_compression": 1.5435
+  },
+  "legacy_full_month_chunking": {
+    "rows": 349577451,
+    "chunk_rows": 4000000,
+    "chunk_count": 88,
+    "mac_seconds": 3699,
+    "windows_seconds": 12873.191412,
+    "windows_to_mac_ratio": 3.48,
+    "mac_rows_per_second": 94505.9,
+    "windows_rows_per_second": 27155.5,
+    "note": "The Windows run used the matched source and engine but its subsequent global merge failed after 297 minutes; the retained 88 chunks are valid for the chunking comparison."
+  },
+  "optimized_four_million_row_benchmark": {
+    "configuration": {
+      "memory_limit": "25GB",
+      "parquet_compression": "ZSTD",
+      "sort": [
+        "author",
+        "subreddit",
+        "created_utc"
+      ],
+      "binary_block_bytes": 8388608
+    },
+    "mac_binary_blocks": {
+      "threads": 9,
+      "repetitions": 3,
+      "median_stage_seconds": 7.413122,
+      "median_parquet_seconds": 8.100857,
+      "median_total_seconds": 15.513979,
+      "median_rows_per_second": 257832.0
+    },
+    "windows_text_lines": {
+      "threads": 4,
+      "repetitions": 1,
+      "stage_seconds": 33.098077,
+      "parquet_seconds": 22.431083,
+      "total_seconds": 55.529159,
+      "rows_per_second": 72034.2
+    },
+    "windows_binary_blocks": {
+      "threads": 4,
+      "repetitions": 3,
+      "median_stage_seconds": 12.239142,
+      "median_parquet_seconds": 22.267151,
+      "median_total_seconds": 34.483701,
+      "median_rows_per_second": 115996.8
+    },
+    "windows_to_mac_ratio": 2.2228,
+    "validation": {
+      "rows": 4000000,
+      "content_fingerprint": 7365298922509737757,
+      "physical_sort_order": true
+    }
+  },
+  "windows_defender_off_comparison": {
+    "configuration": {
+      "rows": 4000000,
+      "threads": 4,
+      "memory_limit": "25GB",
+      "copy_mode": "block",
+      "disabled": [
+        "real-time monitoring",
+        "behavior monitoring",
+        "IOAV protection",
+        "script scanning"
+      ],
+      "still_loaded": [
+        "Defender antivirus engine",
+        "WinDefend service",
+        "MsMpEng process"
+      ]
+    },
+    "runs": [
+      {
+        "stage_seconds": 12.818742,
+        "parquet_seconds": 23.160656,
+        "total_seconds": 35.979398,
+        "rows_per_second": 111174.7
+      },
+      {
+        "stage_seconds": 12.369478,
+        "parquet_seconds": 22.780392,
+        "total_seconds": 35.14987,
+        "rows_per_second": 113798.4
+      },
+      {
+        "stage_seconds": 12.402581,
+        "parquet_seconds": 23.38594,
+        "total_seconds": 35.788521,
+        "rows_per_second": 111767.7
+      }
+    ],
+    "median_stage_seconds": 12.402581,
+    "median_parquet_seconds": 23.160656,
+    "median_total_seconds": 35.788521,
+    "median_rows_per_second": 111767.7,
+    "defender_off_to_on_ratio": 1.0378,
+    "validation": {
+      "rows": 4000000,
+      "content_fingerprint": 7365298922509737757
+    },
+    "conclusion": "Disabling real-time scanning produced no speedup; the measured median was 3.78% slower and within ordinary run variance."
+  },
+  "windows_thread_sweep": {
+    "4": {
+      "total_seconds": 34.483701,
+      "rows_per_second": 115996.8
+    },
+    "7": {
+      "total_seconds": 37.507571,
+      "rows_per_second": 106645.1
+    },
+    "8": {
+      "total_seconds": 34.876737,
+      "rows_per_second": 114689.6
+    }
+  },
+  "windows_chunk_size_sweep": {
+    "2000000": {
+      "total_seconds": 17.474521,
+      "rows_per_second": 114452.4
+    },
+    "4000000": {
+      "total_seconds": 34.483701,
+      "rows_per_second": 115996.8
+    },
+    "6000000": {
+      "total_seconds": 53.927542,
+      "rows_per_second": 111260.4
+    }
+  },
+  "decision": {
+    "stream_copy": "8 MiB binary blocks",
+    "thread_limit": "physical cores, further limited to one thread per 2 GB",
+    "windows_power_plan": "Balanced",
+    "windows_defender": "Enabled",
+    "reason": "Binary block staging removes Python per-row Unicode transcoding and reaches the performance range predicted by the independent CPU and NVMe benchmarks. Disabling real-time scanning did not improve throughput."
+  }
+}
