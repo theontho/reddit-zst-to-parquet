@@ -82,7 +82,7 @@
       "physical_sort_order": true
     }
   },
-  "windows_defender_off_comparison": {
+  "windows_realtime_scanning_disabled_comparison": {
     "configuration": {
       "rows": 4000000,
       "threads": 4,
@@ -124,12 +124,12 @@
     "median_parquet_seconds": 23.160656,
     "median_total_seconds": 35.788521,
     "median_rows_per_second": 111767.7,
-    "defender_off_to_on_ratio": 1.0378,
+    "scanning_disabled_to_enabled_ratio": 1.0378,
     "validation": {
       "rows": 4000000,
       "content_fingerprint": 7365298922509737757
     },
-    "conclusion": "Disabling real-time scanning produced no speedup; the measured median was 3.78% slower and within ordinary run variance."
+    "conclusion": "This was not a fully disabled Defender test because the protected engine, service, process, and file-system filter remained loaded. Disabling real-time scanning produced no speedup; the measured median was 3.78% slower and within ordinary run variance."
   },
   "windows_thread_sweep": {
     "4": {

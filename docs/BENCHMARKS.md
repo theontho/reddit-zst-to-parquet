@@ -95,8 +95,9 @@ threads on Windows and nine on the Mac:
 Disabling Defender real-time, behavior, IOAV, and script scanning did not
 improve this path. Three otherwise identical Windows runs had a median of
 35.79 seconds and 111,768 rows/s, 3.78% slower than the 34.48-second
-Defender-on median and within ordinary run variance. The Defender antivirus
-engine and service remained loaded, while real-time and on-access scanning
+protection-enabled median and within ordinary run variance. This was not a
+fully disabled Defender test: the antivirus engine, protected service, process,
+and file-system filter remained loaded while real-time and on-access scanning
 were verified inactive. All runs produced the same 4M-row content fingerprint.
 
 Binary block streaming makes the optimized Windows path 2.22x slower than the

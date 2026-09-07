@@ -58,10 +58,12 @@ fell from 33.10 seconds with Python text-line iteration to 12.24 seconds with
 8 MiB binary blocks. The full staged conversion fell to 34.48 seconds per 4M
 rows, 3.9x faster than the historical 146-second average.
 
-Do not disable Defender to optimize this conversion. With real-time, behavior,
-IOAV, and script scanning disabled, the same Windows benchmark took a median
-35.79 seconds versus 34.48 seconds with protection enabled. The structural
-binary-streaming change, not antivirus configuration, produced the speedup.
+Disabling Defender's real-time scanning did not optimize this conversion. With
+real-time, behavior, IOAV, and script scanning disabled, the same Windows
+benchmark took a median 35.79 seconds versus 34.48 seconds with protection
+enabled. This was not a full engine-disable test: the protected service,
+process, and file-system filter remained loaded. The structural binary-streaming
+change, not antivirus configuration, produced the measured speedup.
 
 DuckDB 1.5.2 successfully read the tested long-range-compressed Zstandard file
 directly. Older DuckDB versions previously required the system `zstd` decoder
