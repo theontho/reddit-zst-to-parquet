@@ -19,8 +19,8 @@ reddit-zst-benchmark/
 │       ├── RC_2026-04.zst
 │       ├── RC_2026-05.zst
 │       └── RC_2026-06.zst
-├── reddit-zst-to-parquet/
-└── reddit-zst-to-parquet.bundle
+├── reddit-zst-to-parquet.bundle
+└── reddit-zst-to-parquet-<commit>.tar.gz
 ```
 
 `RC_2026-05.zst` is the canonical cross-machine comparison source:
@@ -53,8 +53,9 @@ printf '%s  %s\n' \
   data/comments/RC_2026-05.zst | shasum -a 256 -c -
 ```
 
-Clone the repository bundle onto the internal NVMe. The bundle makes the
-handoff independent of network access:
+Clone the repository bundle onto the internal NVMe. The bundle contains Git
+history and makes the handoff independent of network access. The `.tar.gz`
+file is a browseable source snapshot but is not needed for the benchmark:
 
 ```bash
 test ! -e "$HOME/src/reddit-zst-to-parquet"
