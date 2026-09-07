@@ -6,8 +6,11 @@ tracked; the compact raw results are in
 [`docs/benchmarks/RC_2026-05-chunk-sizing.json`](benchmarks/RC_2026-05-chunk-sizing.json)
 and
 [`docs/benchmarks/RS_2026-05-chunk-sizing.json`](benchmarks/RS_2026-05-chunk-sizing.json).
-The cross-platform Windows optimization results are in
+The cross-platform Mac and Windows optimization results are in
 [`docs/benchmarks/RC_2026-05-windows-optimization.json`](benchmarks/RC_2026-05-windows-optimization.json).
+The same benchmark rerun on the former Windows machine after installing Linux
+is in
+[`docs/benchmarks/RC_2026-05-linux-comparison.json`](benchmarks/RC_2026-05-linux-comparison.json).
 Use the tracked [`benchmarks.conversion`](../benchmarks/README.md) harness to
 rerun the staged or direct conversion paths on macOS, Windows, or Linux. It
 captures environment metadata and validates source hashes, row counts,
@@ -61,7 +64,7 @@ The sorted direct output was 601,763,427 bytes versus 674,975,210 bytes for the
 unsorted output, a 10.85% reduction. Better compression made direct sorted
 output faster than direct unsorted output despite the sort work.
 
-### Windows block-streaming optimization
+### Cross-platform block-streaming optimization
 
 A matched legacy run on the Ryzen 3 PRO 5350GE Windows node took 12,873 seconds
 to produce the same 88 four-million-row chunks that the M1 Pro produced in
@@ -131,6 +134,33 @@ eight. The engine therefore caps chunk workers at physical cores as well as
 the memory-derived limit. High performance versus Balanced power plans made no
 measurable difference (34.58 versus 34.48 seconds), so Balanced was restored.
 
+The same Ryzen machine was wiped and retested under Ubuntu Linux using the
+tracked benchmark harness. The source remained on the same SanDisk SATA SSD,
+mounted read-only through Linux's NTFS/FUSE path, while staging, Parquet output,
+and DuckDB temporary data used the same SK hynix NVMe. Linux used the default
+`amd-pstate-epp` `powersave` governor with its energy-performance preference
+set to `performance`; no antivirus was installed. The source size and SHA-256
+matched the Mac and Windows runs exactly.
+
+| Machine/OS | Median stage | Median Parquet | Median total | Throughput |
+|---|---:|---:|---:|---:|
+| M1 Pro, macOS | 7.41 s | 8.10 s | 15.51 s | 257,832 rows/s |
+| Ryzen 5350GE, Windows | 12.24 s | 22.27 s | 34.48 s | 115,997 rows/s |
+| **Ryzen 5350GE, Linux** | **14.46 s** | **17.41 s** | **31.96 s** | **125,165 rows/s** |
+
+Linux was **7.3% faster overall than Windows** on the identical Ryzen hardware.
+Its DuckDB parse, normalize, sort, and Parquet phase was 21.8% faster, while
+staging was 18.2% slower. The staging result includes Zstandard decompression
+and reads through NTFS/FUSE, so this benchmark does not isolate filesystem
+overhead from decoder or operating-system differences. The M1 Pro remained
+2.06x faster than Ryzen/Linux overall, with 1.95x and 2.15x advantages in the
+staging and Parquet phases respectively.
+
+All three Linux runs produced 4,000,000 rows with content fingerprint
+`7365298922509737757`, the same schema as the Mac and Windows outputs, and zero
+physical sort-order violations. The three totals were 32.26, 31.64, and 31.96
+seconds.
+
 The 4M Windows result was slightly faster per row than 2M and 6M:
 
 | Rows | Total | Throughput |
@@ -140,9 +170,9 @@ The 4M Windows result was slightly faster per row than 2M and 6M:
 | 6M | 53.93 s | 111,260 rows/s |
 
 These differences are small enough that memory and query-layout requirements
-remain the primary chunk-size criteria. The key Windows optimization is binary
-block staging, not a platform-specific chunk size, power plan, or weakened
-antivirus protection.
+remain the primary chunk-size criteria. The key cross-platform optimization is
+binary block staging, not a platform-specific chunk size, power plan, or
+weakened antivirus protection.
 
 ### Scaling from two to eight million rows
 

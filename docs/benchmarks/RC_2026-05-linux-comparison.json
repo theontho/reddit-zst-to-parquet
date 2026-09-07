@@ -1,0 +1,111 @@
+{
+  "benchmark_date": "2026-09-07",
+  "benchmark": "Reddit ZST to sorted Parquet conversion",
+  "benchmark_version": 1,
+  "harness": {
+    "path": "benchmarks/conversion.py",
+    "git_commit": "128ca19f6e14c61520ce6ef5ccb7731720abc0f0",
+    "git_dirty": false
+  },
+  "source": {
+    "filename": "RC_2026-05.zst",
+    "bytes": 47844685635,
+    "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+    "disk": "SanDisk SD8TB8U2 SATA SSD",
+    "filesystem": "NTFS/FUSE, read-only"
+  },
+  "system": {
+    "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+    "cpu": "AMD Ryzen 3 PRO 5350GE with Radeon Graphics",
+    "physical_cores": 4,
+    "logical_cores": 8,
+    "memory_bytes": 32998207488,
+    "output_disk": "SK hynix SHGP31-1000GM-2 NVMe",
+    "python": "3.12.3",
+    "duckdb": "1.5.2",
+    "zstd_cli": "1.5.5",
+    "protection": "none",
+    "cpu_frequency_driver": "amd-pstate-epp",
+    "power_governor": "powersave",
+    "energy_performance_preference": "performance"
+  },
+  "configuration": {
+    "rows": 4000000,
+    "repetitions": 3,
+    "warmups": 0,
+    "threads": 4,
+    "memory_limit_gb": 25,
+    "mode": "staged",
+    "copy_mode": "block",
+    "binary_block_bytes": 8388608,
+    "compression": "ZSTD",
+    "sort": [
+      "author",
+      "subreddit",
+      "created_utc"
+    ],
+    "jsonl_bytes": 7804469466
+  },
+  "runs": [
+    {
+      "stage_seconds": 14.857705,
+      "parquet_seconds": 17.406282,
+      "total_seconds": 32.263987,
+      "rows_per_second": 123977.2,
+      "output_bytes": 601765726
+    },
+    {
+      "stage_seconds": 14.46481,
+      "parquet_seconds": 17.179161,
+      "total_seconds": 31.64397,
+      "rows_per_second": 126406.4,
+      "output_bytes": 601767303
+    },
+    {
+      "stage_seconds": 14.407899,
+      "parquet_seconds": 17.549817,
+      "total_seconds": 31.957716,
+      "rows_per_second": 125165.4,
+      "output_bytes": 601770410
+    }
+  ],
+  "summary": {
+    "median_stage_seconds": 14.46481,
+    "median_parquet_seconds": 17.406282,
+    "median_total_seconds": 31.957716,
+    "median_rows_per_second": 125165.4
+  },
+  "comparison": {
+    "mac_m1_pro": {
+      "median_stage_seconds": 7.413122,
+      "median_parquet_seconds": 8.100857,
+      "median_total_seconds": 15.513979,
+      "median_rows_per_second": 257832.0,
+      "linux_to_mac_time_ratios": {
+        "staging": 1.9512,
+        "parquet": 2.1487,
+        "total": 2.0599
+      }
+    },
+    "windows_same_ryzen_hardware": {
+      "median_stage_seconds": 12.239142,
+      "median_parquet_seconds": 22.267151,
+      "median_total_seconds": 34.483701,
+      "median_rows_per_second": 115996.8,
+      "windows_to_linux_time_ratios": {
+        "staging": 0.8461,
+        "parquet": 1.2793,
+        "total": 1.079
+      },
+      "linux_throughput_advantage_percent": 7.9,
+      "linux_wall_time_reduction_percent": 7.3
+    }
+  },
+  "validation": {
+    "rows": 4000000,
+    "content_fingerprint": 7365298922509737757,
+    "schema_match": true,
+    "physical_sort_violations": 0
+  },
+  "conclusion": "Linux reduced total wall time by 7.3% on the same Ryzen hardware. Its DuckDB phase was 21.8% faster than Windows, while staging was 18.2% slower with the source read through NTFS/FUSE. The M1 Pro remained 2.06x faster overall."
+}

@@ -65,6 +65,15 @@ enabled. This was not a full engine-disable test: the protected service,
 process, and file-system filter remained loaded. The structural binary-streaming
 change, not antivirus configuration, produced the measured speedup.
 
+After replacing Windows with Ubuntu on the same Ryzen 3 PRO 5350GE machine,
+the matched 4M-row staged conversion took 31.96 seconds, 7.3% less wall time
+than Windows. Linux's DuckDB phase was 21.8% faster, but staging from the same
+SATA source disk was 18.2% slower while the preserved NTFS volume was mounted
+read-only through FUSE. This supports Linux for the conversion host, but also
+reinforces the recommendation to keep active source and scratch data on a
+native fast filesystem rather than treating the operating system alone as the
+optimization.
+
 DuckDB 1.5.2 successfully read the tested long-range-compressed Zstandard file
 directly. Older DuckDB versions previously required the system `zstd` decoder
 and a FIFO, so direct decoding must remain covered by a real conversion smoke
