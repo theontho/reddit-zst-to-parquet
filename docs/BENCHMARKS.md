@@ -92,6 +92,20 @@ threads on Windows and nine on the Mac:
 | Ryzen 5350GE, text lines | 1 | 33.10 s | 22.43 s | 55.53 s | 72,034 rows/s |
 | **Ryzen 5350GE, binary blocks** | **3** | **12.24 s** | **22.27 s** | **34.48 s** | **115,997 rows/s** |
 
+The optimized protection-enabled comparison is:
+
+| Phase/path | M1 Pro | Ryzen 5350GE | Windows/Mac time |
+|---|---:|---:|---:|
+| Binary staging | 7.41 s | 12.24 s | 1.65x |
+| DuckDB to sorted Parquet | 8.10 s | 22.27 s | 2.75x |
+| **Staged total** | **15.51 s** | **34.48 s** | **2.22x** |
+| Direct DuckDB ZSTD to sorted Parquet | 23.42 s | 44.40 s | 1.90x |
+
+The optimized staged path takes 55.0% less wall time on the Mac. The direct
+result is a one-pass comparison, not the production chunking design: applying
+`LIMIT/OFFSET` repeatedly to direct ingestion would decompress the source again
+for every chunk.
+
 Disabling Defender real-time, behavior, IOAV, and script scanning did not
 improve this path. Three otherwise identical Windows runs had a median of
 35.79 seconds and 111,768 rows/s, 3.78% slower than the 34.48-second

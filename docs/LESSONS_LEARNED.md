@@ -152,6 +152,13 @@ explicit `--chunk-size` overrides automatic sizing and logs a warning when it
 exceeds the spill-avoiding estimate. Set `pipeline.adaptive_chunk_size = false`
 to use the configured `pipeline.chunk_size` instead.
 
+The selected Windows operating profile keeps Defender enabled, uses the
+Balanced power plan, stages 8 MiB binary blocks, caps DuckDB at four physical
+cores, converts chunks sequentially so zstd does not compete with DuckDB, and
+skips the global merge. Changing the power plan, using SMT threads, overlapping
+decompression with conversion, and disabling real-time scanning did not improve
+the measured Windows throughput.
+
 ## Query-layout lessons
 
 The file-size query benchmark compared identical 349,577,451-row datasets with

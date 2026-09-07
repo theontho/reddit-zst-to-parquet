@@ -76,11 +76,25 @@
       "median_rows_per_second": 115996.8
     },
     "windows_to_mac_ratio": 2.2228,
+    "phase_windows_to_mac_ratios": {
+      "staging": 1.651,
+      "parquet": 2.7487,
+      "total": 2.2228
+    },
+    "mac_wall_time_reduction_percent": 55.01,
     "validation": {
       "rows": 4000000,
       "content_fingerprint": 7365298922509737757,
       "physical_sort_order": true
     }
+  },
+  "direct_duckdb_four_million_row_benchmark": {
+    "mac_seconds": 23.424751,
+    "mac_repetitions": 3,
+    "windows_seconds": 44.4,
+    "windows_repetitions": 1,
+    "windows_to_mac_ratio": 1.8954,
+    "note": "This is a one-pass comparison, not the production chunking design. Repeated LIMIT/OFFSET direct ingestion would decompress the source again for each chunk."
   },
   "windows_realtime_scanning_disabled_comparison": {
     "configuration": {
@@ -162,6 +176,8 @@
   "decision": {
     "stream_copy": "8 MiB binary blocks",
     "thread_limit": "physical cores, further limited to one thread per 2 GB",
+    "pipeline_overlap": false,
+    "global_merge": false,
     "windows_power_plan": "Balanced",
     "windows_defender": "Enabled",
     "reason": "Binary block staging removes Python per-row Unicode transcoding and reaches the performance range predicted by the independent CPU and NVMe benchmarks. Disabling real-time scanning did not improve throughput."
