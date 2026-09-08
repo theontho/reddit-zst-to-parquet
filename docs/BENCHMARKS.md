@@ -13,6 +13,8 @@ is in
 [`docs/benchmarks/RC_2026-05-linux-comparison.json`](benchmarks/RC_2026-05-linux-comparison.json).
 The native-NVMe 4M/6M follow-up is in
 [`docs/benchmarks/RC_2026-05-linux-nvme-chunks.json`](benchmarks/RC_2026-05-linux-nvme-chunks.json).
+The post-reinstall Omarchy RC/RS threaded-decoder suite is in
+[`docs/benchmarks/RC_RS_2026-05-omarchy-suite.json`](benchmarks/RC_RS_2026-05-omarchy-suite.json).
 Use the tracked [`benchmarks.conversion`](../benchmarks/README.md) harness to
 rerun the staged or direct conversion paths on macOS, Windows, or Linux. It
 captures environment metadata and validates source hashes, row counts,
@@ -187,6 +189,36 @@ All six native-NVMe runs matched their expected row count and schema, had
 consistent fingerprints within each row count, and had zero physical
 sort-order violations. The 4M fingerprint was `7365298922509737757`; the 6M
 fingerprint was `2755064075187337237`.
+
+#### Omarchy threaded-decoder suite
+
+After reinstalling the same Ryzen system with Omarchy, the complete May
+comment and submission sources were copied to the internal SK hynix NVMe and
+reverified. The tracked version-2 harness at commit `b44c6d8` used the bounded
+`python-threaded` decoder, four physical-core threads, a 25 GB DuckDB limit,
+and three repetitions. The Btrfs filesystem used transparent Zstandard
+compression, and the CPU governor and energy preference both reported
+`performance`.
+
+| Dataset | Rows | Median stage | Median Parquet | Median total | Throughput |
+|---|---:|---:|---:|---:|---:|
+| Comments | 4M | 13.03 s | 21.58 s | 34.61 s | 115,578 rows/s |
+| Comments | 6M | 20.35 s | 32.92 s | 54.52 s | 110,055 rows/s |
+| Submissions | 500k | 4.61 s | 21.40 s | 26.28 s | 19,023 rows/s |
+| Submissions | 1.5M | 13.19 s | 38.75 s | 51.94 s | 28,878 rows/s |
+
+All twelve outputs matched the expected source hash, row count, schema,
+content fingerprint within each workload, and physical sort order. The
+results validate both RC and wider RS data through the new decoder, including
+concatenated-frame and error-propagation behavior covered by the regression
+suite.
+
+This is not a strict performance comparison with the prior Ubuntu/ext4 run:
+the distribution, kernel, Python version, filesystem, mount compression, and
+power governor all changed. The Omarchy staging medians were 9.7% lower at 4M
+and 7.4% lower at 6M, but slower Parquet phases made total throughput lower.
+Use the suite as a current reproducibility baseline, not as evidence that the
+OS reinstall itself improved or regressed DuckDB.
 
 The 4M Windows result was slightly faster per row than 2M and 6M:
 

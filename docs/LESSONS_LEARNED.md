@@ -51,12 +51,34 @@ buffering became progressively slower as chunk size increased and raised the
 process working set. Keep row parsing, normalization, sorting, and Parquet
 encoding inside DuckDB.
 
-When an intermediate JSONL chunk is still required for resumability, keep the
-Zstandard subprocess in binary mode and copy large blocks rather than decoding
-and re-encoding one line at a time. On the tested Windows node, staging 4M rows
-fell from 33.10 seconds with Python text-line iteration to 12.24 seconds with
-8 MiB binary blocks. The full staged conversion fell to 34.48 seconds per 4M
-rows, 3.9x faster than the historical 146-second average.
+When an intermediate JSONL chunk is still required for resumability, decode
+and copy large binary blocks rather than decoding and re-encoding one line at
+a time. On the tested Windows node, staging 4M rows fell from 33.10 seconds
+with Python text-line iteration to 12.24 seconds with 8 MiB binary blocks. The
+full staged conversion fell to 34.48 seconds per 4M rows, 3.9x faster than the
+historical 146-second average.
+
+The current default removes the subprocess from this path as well. A worker
+thread decompresses 8 MiB blocks in process while the main thread counts
+newlines and writes JSONL. A two-block queue bounds read-ahead to about 16 MiB
+and preserves chunk boundaries, concatenated Zstandard frames, resumability,
+and decoder error propagation. The system `zstd` path remains available as an
+explicit fallback.
+
+During Ubuntu development, isolated 4M staging took 14.41 seconds through the
+original CLI pipe, 13.89 seconds with a larger pipe, 13.84 seconds with
+serialized in-process decoding, and 9.53 seconds with the bounded threaded
+reader. A single fully validated integrated run took 10.31 seconds to stage
+and 27.52 seconds total, or 145,354 rows/s. These were development
+measurements rather than a repeated canonical result; the planned 6M repeat
+was interrupted by the machine reinstall.
+
+The later three-repetition Omarchy suite validated the committed decoder on
+both record types. Median staging was 13.03 seconds for 4M comments, 20.35
+seconds for 6M comments, 4.61 seconds for 500k submissions, and 13.19 seconds
+for 1.5M submissions. Do not compare those totals directly with Ubuntu:
+Omarchy also changed the kernel, Python version, filesystem, transparent
+compression, and power governor.
 
 Disabling Defender's real-time scanning did not optimize this conversion. With
 real-time, behavior, IOAV, and script scanning disabled, the same Windows

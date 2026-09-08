@@ -1,0 +1,219 @@
+{
+  "benchmark_date": "2026-09-08",
+  "benchmark": "Omarchy threaded staged conversion suite",
+  "benchmark_version": 2,
+  "harness": {
+    "path": "benchmarks/conversion.py",
+    "runner": "benchmarks/run_linux_ryzen_5350ge_suite.sh",
+    "git_commit": "b44c6d8745e36fd510b08b67af0a7e5a6c7e8e69",
+    "git_dirty": false
+  },
+  "sources": {
+    "comments": {
+      "filename": "RC_2026-05.zst",
+      "bytes": 47844685635,
+      "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc"
+    },
+    "submissions": {
+      "filename": "RS_2026-05.zst",
+      "bytes": 23823383434,
+      "sha256": "83f25791b1d7cf8663a5c5cea46d291924adf2e00ba02b450c564711725ffcef"
+    }
+  },
+  "system": {
+    "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+    "distribution": "Omarchy 4.0.2",
+    "cpu": "AMD Ryzen 3 PRO 5350GE with Radeon Graphics",
+    "physical_cores": 4,
+    "logical_cores": 8,
+    "memory_bytes": 32989708288,
+    "disk": "SK hynix SHGP31-1000GM-2 NVMe",
+    "filesystem": "Btrfs with zstd:3 compression",
+    "python": "3.14.7",
+    "duckdb": "1.5.2",
+    "python_zstandard": "0.25.0",
+    "libzstd": "1.5.7",
+    "protection": "none",
+    "power_governor": "performance",
+    "energy_performance_preference": "performance"
+  },
+  "configuration": {
+    "repetitions": 3,
+    "warmups": 0,
+    "threads": 4,
+    "memory_limit_gb": 25,
+    "mode": "staged",
+    "copy_mode": "block",
+    "decoder": "python-threaded",
+    "binary_block_bytes": 8388608,
+    "compression": "ZSTD",
+    "sort": [
+      "author",
+      "subreddit",
+      "created_utc"
+    ],
+    "source_disk": "internal NVMe",
+    "output_disk": "internal NVMe"
+  },
+  "workloads": {
+    "RC_2026-05_4000000": {
+      "rows": 4000000,
+      "jsonl_bytes": 7804469466,
+      "runs": [
+        {
+          "stage_seconds": 13.672651,
+          "parquet_seconds": 22.485159,
+          "total_seconds": 36.15781,
+          "rows_per_second": 110626.2,
+          "output_bytes": 601761576
+        },
+        {
+          "stage_seconds": 13.025864,
+          "parquet_seconds": 21.582788,
+          "total_seconds": 34.608652,
+          "rows_per_second": 115578.0,
+          "output_bytes": 601769364
+        },
+        {
+          "stage_seconds": 12.151828,
+          "parquet_seconds": 19.798533,
+          "total_seconds": 31.95036,
+          "rows_per_second": 125194.2,
+          "output_bytes": 601769558
+        }
+      ],
+      "median": {
+        "stage_seconds": 13.025864,
+        "parquet_seconds": 21.582788,
+        "total_seconds": 34.608652,
+        "rows_per_second": 115578.0
+      },
+      "validation": {
+        "content_fingerprint": 7365298922509737757,
+        "schema_match": true,
+        "physical_sort_violations": 0
+      }
+    },
+    "RC_2026-05_6000000": {
+      "rows": 6000000,
+      "jsonl_bytes": 11718859584,
+      "runs": [
+        {
+          "stage_seconds": 21.602329,
+          "parquet_seconds": 32.915781,
+          "total_seconds": 54.518109,
+          "rows_per_second": 110055.2,
+          "output_bytes": 899208201
+        },
+        {
+          "stage_seconds": 20.348633,
+          "parquet_seconds": 32.302125,
+          "total_seconds": 52.650758,
+          "rows_per_second": 113958.5,
+          "output_bytes": 899207360
+        },
+        {
+          "stage_seconds": 20.287663,
+          "parquet_seconds": 34.289485,
+          "total_seconds": 54.577148,
+          "rows_per_second": 109936.1,
+          "output_bytes": 899208415
+        }
+      ],
+      "median": {
+        "stage_seconds": 20.348633,
+        "parquet_seconds": 32.915781,
+        "total_seconds": 54.518109,
+        "rows_per_second": 110055.2
+      },
+      "validation": {
+        "content_fingerprint": 2755064075187337237,
+        "schema_match": true,
+        "physical_sort_violations": 0
+      }
+    },
+    "RS_2026-05_500000": {
+      "rows": 500000,
+      "jsonl_bytes": 2685781400,
+      "runs": [
+        {
+          "stage_seconds": 4.463847,
+          "parquet_seconds": 20.625226,
+          "total_seconds": 25.089073,
+          "rows_per_second": 19929.0,
+          "output_bytes": 307616101
+        },
+        {
+          "stage_seconds": 4.885527,
+          "parquet_seconds": 21.39776,
+          "total_seconds": 26.283287,
+          "rows_per_second": 19023.5,
+          "output_bytes": 307613381
+        },
+        {
+          "stage_seconds": 4.61357,
+          "parquet_seconds": 22.822527,
+          "total_seconds": 27.436097,
+          "rows_per_second": 18224.2,
+          "output_bytes": 307615651
+        }
+      ],
+      "median": {
+        "stage_seconds": 4.61357,
+        "parquet_seconds": 21.39776,
+        "total_seconds": 26.283287,
+        "rows_per_second": 19023.5
+      },
+      "validation": {
+        "content_fingerprint": 15840208280275055463,
+        "schema_match": true,
+        "physical_sort_violations": 0
+      }
+    },
+    "RS_2026-05_1500000": {
+      "rows": 1500000,
+      "jsonl_bytes": 8065620271,
+      "runs": [
+        {
+          "stage_seconds": 15.508585,
+          "parquet_seconds": 45.255291,
+          "total_seconds": 60.763876,
+          "rows_per_second": 24685.7,
+          "output_bytes": 929232326
+        },
+        {
+          "stage_seconds": 12.859538,
+          "parquet_seconds": 37.620499,
+          "total_seconds": 50.480036,
+          "rows_per_second": 29714.7,
+          "output_bytes": 929234374
+        },
+        {
+          "stage_seconds": 13.194709,
+          "parquet_seconds": 38.748491,
+          "total_seconds": 51.943201,
+          "rows_per_second": 28877.7,
+          "output_bytes": 929232501
+        }
+      ],
+      "median": {
+        "stage_seconds": 13.194709,
+        "parquet_seconds": 38.748491,
+        "total_seconds": 51.943201,
+        "rows_per_second": 28877.7
+      },
+      "validation": {
+        "content_fingerprint": 3527107192750749198,
+        "schema_match": true,
+        "physical_sort_violations": 0
+      }
+    }
+  },
+  "validation": {
+    "source_hashes_matched": true,
+    "row_counts_matched": true,
+    "schemas_matched": true,
+    "fingerprints_consistent_within_workloads": true,
+    "physical_sort_violations": 0
+  }
+}
