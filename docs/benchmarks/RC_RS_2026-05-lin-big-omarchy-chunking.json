@@ -1,0 +1,317 @@
+{
+  "benchmark_date": "2026-09-08",
+  "benchmark": "Matched full-May Omarchy chunking comparison",
+  "benchmark_version": 1,
+  "scope": "Chunk staging, normalized sorted Parquet creation, and validation only; no global merge.",
+  "harness": {
+    "path_at_run": "out/benchmark-2026-05-lin-big-omarchy/harness/full_pipeline.py",
+    "sha256": "3173f15c44b7a9ecde17f6933d649d30f8357356e4fe59245b2f7d2970a525e6",
+    "summarizer_path": "out/benchmark-2026-05-lin-big-omarchy/summarize.py",
+    "summarizer_sha256": "21ca5c8e75feb2a9ed1e06f6b353484c83a198ff746012c9123ce53f34e56cd5"
+  },
+  "current_machine": {
+    "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+    "system": "Linux",
+    "release": "7.1.9-arch1-2",
+    "machine": "x86_64",
+    "cpu": "AMD Ryzen 5 5600X 6-Core Processor",
+    "physical_cores": 6,
+    "logical_cores": 12,
+    "memory_bytes": 67358957568,
+    "python": "3.14.7",
+    "duckdb": "1.5.2",
+    "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+    "python_zstandard": "0.25.0",
+    "python_zstandard_libzstd": "1.5.7",
+    "git": {
+      "commit": "3ea1e7019a100ec564794e110b41d57f94f3b7bd",
+      "dirty": false
+    },
+    "hostname": "lin-big-omarchy",
+    "distribution": "Omarchy 4.0.2",
+    "disk": "Sabrent 2 TB NVMe",
+    "filesystem": "encrypted Btrfs with zstd:3 compression",
+    "power_governor": "performance",
+    "energy_performance_preference": "performance"
+  },
+  "reference_machine": {
+    "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+    "system": "Linux",
+    "release": "7.1.9-arch1-2",
+    "machine": "x86_64",
+    "cpu": "AMD Ryzen 3 PRO 5350GE with Radeon Graphics",
+    "physical_cores": 4,
+    "logical_cores": 8,
+    "memory_bytes": 32989708288,
+    "python": "3.14.7",
+    "duckdb": "1.5.2",
+    "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+    "python_zstandard": "0.25.0",
+    "python_zstandard_libzstd": "1.5.7",
+    "git": {
+      "commit": "b44c6d8745e36fd510b08b67af0a7e5a6c7e8e69",
+      "dirty": true
+    },
+    "hostname": "lin-omarchy",
+    "distribution": "Omarchy 4.0.2",
+    "disk": "SK hynix SHGP31-1000GM-2 NVMe",
+    "filesystem": "encrypted Btrfs with zstd:3 compression",
+    "power_governor": "performance",
+    "energy_performance_preference": "performance"
+  },
+  "configuration": {
+    "chunk_rows": 6000000,
+    "threads": 4,
+    "memory_gb": 24,
+    "merge_memory_gb": 20,
+    "row_group_size": 100000,
+    "decoder": "python-threaded",
+    "compression": "ZSTD",
+    "sort": [
+      "author",
+      "subreddit",
+      "created_utc"
+    ]
+  },
+  "datasets": {
+    "RC_2026_05": {
+      "current": {
+        "rows": 349577451,
+        "chunks": 59,
+        "source_bytes": 47844685635,
+        "source_sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+        "jsonl_bytes": 684006453779,
+        "parquet_bytes": 52982230335,
+        "staging_seconds": 914.8016767520003,
+        "conversion_seconds": 1371.16396437,
+        "validation_seconds": 145.78655524699843,
+        "chunking_seconds": 2285.9656411220003,
+        "including_validation_seconds": 2431.7521963689987,
+        "rows_per_second": 152923.3181424459,
+        "cpu_seconds": 6683.489999999999,
+        "average_cpu_cores_including_validation": 2.7484256043767683,
+        "peak_rss_bytes": 18276425728,
+        "peak_spill_bytes": 0,
+        "process_disk_read_bytes": 45280342016,
+        "process_disk_write_bytes": 737011724288,
+        "settings": {
+          "chunk_rows": 6000000,
+          "threads": 4,
+          "memory_gb": 24,
+          "merge_memory_gb": 20,
+          "row_group_size": 100000,
+          "decoder": "python-threaded",
+          "compression": "ZSTD",
+          "sort": [
+            "author",
+            "subreddit",
+            "created_utc"
+          ]
+        },
+        "system": {
+          "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+          "system": "Linux",
+          "release": "7.1.9-arch1-2",
+          "machine": "x86_64",
+          "cpu": "AMD Ryzen 5 5600X 6-Core Processor",
+          "physical_cores": 6,
+          "logical_cores": 12,
+          "memory_bytes": 67358957568,
+          "python": "3.14.7",
+          "duckdb": "1.5.2",
+          "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+          "python_zstandard": "0.25.0",
+          "python_zstandard_libzstd": "1.5.7",
+          "git": {
+            "commit": "3ea1e7019a100ec564794e110b41d57f94f3b7bd",
+            "dirty": false
+          }
+        }
+      },
+      "reference": {
+        "rows": 349577451,
+        "chunks": 59,
+        "source_bytes": 47844685635,
+        "source_sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+        "jsonl_bytes": 684006453779,
+        "parquet_bytes": 52982110152,
+        "staging_seconds": 1135.7263622859973,
+        "conversion_seconds": 1799.4899701760005,
+        "validation_seconds": 198.47072249200573,
+        "chunking_seconds": 2935.216332461998,
+        "including_validation_seconds": 3133.6870549540035,
+        "rows_per_second": 119097.67846882406,
+        "cpu_seconds": 8580.780000000002,
+        "average_cpu_cores_including_validation": 2.738237689189405,
+        "peak_rss_bytes": 18653945856,
+        "peak_spill_bytes": 0,
+        "process_disk_read_bytes": 49846013952,
+        "process_disk_write_bytes": 737014878208,
+        "settings": {
+          "chunk_rows": 6000000,
+          "threads": 4,
+          "memory_gb": 24,
+          "merge_memory_gb": 20,
+          "row_group_size": 100000,
+          "decoder": "python-threaded",
+          "compression": "ZSTD",
+          "sort": [
+            "author",
+            "subreddit",
+            "created_utc"
+          ]
+        },
+        "system": {
+          "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+          "system": "Linux",
+          "release": "7.1.9-arch1-2",
+          "machine": "x86_64",
+          "cpu": "AMD Ryzen 3 PRO 5350GE with Radeon Graphics",
+          "physical_cores": 4,
+          "logical_cores": 8,
+          "memory_bytes": 32989708288,
+          "python": "3.14.7",
+          "duckdb": "1.5.2",
+          "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+          "python_zstandard": "0.25.0",
+          "python_zstandard_libzstd": "1.5.7",
+          "git": {
+            "commit": "b44c6d8745e36fd510b08b67af0a7e5a6c7e8e69",
+            "dirty": true
+          }
+        }
+      },
+      "chunking_speedup": 1.284015944798423,
+      "elapsed_reduction_percent": 22.119347189493855,
+      "all_chunk_contents_match_reference": true
+    },
+    "RS_2026_05": {
+      "current": {
+        "rows": 47453180,
+        "chunks": 32,
+        "source_bytes": 23823383434,
+        "source_sha256": "83f25791b1d7cf8663a5c5cea46d291924adf2e00ba02b450c564711725ffcef",
+        "jsonl_bytes": 252661030818,
+        "parquet_bytes": 29108312151,
+        "staging_seconds": 347.73568995699316,
+        "conversion_seconds": 1139.7709363579925,
+        "validation_seconds": 61.108701344998735,
+        "chunking_seconds": 1487.5066263149856,
+        "including_validation_seconds": 1548.6153276599844,
+        "rows_per_second": 31901.155370014192,
+        "cpu_seconds": 3548.15,
+        "average_cpu_cores_including_validation": 2.2911758243807308,
+        "peak_rss_bytes": 19944300544,
+        "peak_spill_bytes": 0,
+        "process_disk_read_bytes": 5702197248,
+        "process_disk_write_bytes": 281782714368,
+        "settings": {
+          "chunk_rows": 1500000,
+          "threads": 4,
+          "memory_gb": 24,
+          "merge_memory_gb": 20,
+          "row_group_size": 100000,
+          "decoder": "python-threaded",
+          "compression": "ZSTD",
+          "sort": [
+            "author",
+            "subreddit",
+            "created_utc"
+          ]
+        },
+        "system": {
+          "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+          "system": "Linux",
+          "release": "7.1.9-arch1-2",
+          "machine": "x86_64",
+          "cpu": "AMD Ryzen 5 5600X 6-Core Processor",
+          "physical_cores": 6,
+          "logical_cores": 12,
+          "memory_bytes": 67358957568,
+          "python": "3.14.7",
+          "duckdb": "1.5.2",
+          "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+          "python_zstandard": "0.25.0",
+          "python_zstandard_libzstd": "1.5.7",
+          "git": {
+            "commit": "3ea1e7019a100ec564794e110b41d57f94f3b7bd",
+            "dirty": false
+          }
+        }
+      },
+      "reference": {
+        "rows": 47453180,
+        "chunks": 32,
+        "source_bytes": 23823383434,
+        "source_sha256": "83f25791b1d7cf8663a5c5cea46d291924adf2e00ba02b450c564711725ffcef",
+        "jsonl_bytes": 252661030818,
+        "parquet_bytes": 29108380748,
+        "staging_seconds": 436.727870119983,
+        "conversion_seconds": 1354.8346547439942,
+        "validation_seconds": 80.04610449600659,
+        "chunking_seconds": 1791.5625248639772,
+        "including_validation_seconds": 1871.6086293599838,
+        "rows_per_second": 26487.035390295878,
+        "cpu_seconds": 4247.099999999999,
+        "average_cpu_cores_including_validation": 2.2692244165663737,
+        "peak_rss_bytes": 20513267712,
+        "peak_spill_bytes": 0,
+        "process_disk_read_bytes": 22869147648,
+        "process_disk_write_bytes": 281783693312,
+        "settings": {
+          "chunk_rows": 1500000,
+          "threads": 4,
+          "memory_gb": 24,
+          "merge_memory_gb": 20,
+          "row_group_size": 100000,
+          "decoder": "python-threaded",
+          "compression": "ZSTD",
+          "sort": [
+            "author",
+            "subreddit",
+            "created_utc"
+          ]
+        },
+        "system": {
+          "platform": "Linux-7.1.9-arch1-2-x86_64-with-glibc2.44",
+          "system": "Linux",
+          "release": "7.1.9-arch1-2",
+          "machine": "x86_64",
+          "cpu": "AMD Ryzen 3 PRO 5350GE with Radeon Graphics",
+          "physical_cores": 4,
+          "logical_cores": 8,
+          "memory_bytes": 32989708288,
+          "python": "3.14.7",
+          "duckdb": "1.5.2",
+          "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+          "python_zstandard": "0.25.0",
+          "python_zstandard_libzstd": "1.5.7",
+          "git": {
+            "commit": "b44c6d8745e36fd510b08b67af0a7e5a6c7e8e69",
+            "dirty": true
+          }
+        }
+      },
+      "chunking_speedup": 1.204406416193407,
+      "elapsed_reduction_percent": 16.97154826187698,
+      "all_chunk_contents_match_reference": true
+    }
+  },
+  "raw_artifacts": {
+    "root": "out/benchmark-2026-05-lin-big-omarchy",
+    "clean_results_root": "out/benchmark-2026-05-lin-big-omarchy/results-clean",
+    "chunk_profiles": 91,
+    "telemetry_files": 2,
+    "phase_files": 2,
+    "telemetry_profile_state_bytes": 8921765
+  },
+  "validation": {
+    "source_hashes_matched": true,
+    "row_counts_matched": true,
+    "settings_matched": true,
+    "software_versions_matched": true,
+    "all_chunk_contents_match_reference": true,
+    "chunk_peak_spill_bytes": 0
+  },
+  "conclusion": "With both machines limited to four DuckDB threads and 24 GB, lin-big-omarchy completed RC chunking 1.284x faster and RS chunking 1.204x faster than lin-omarchy. The elapsed reductions were 22.12% and 16.97%. Both runs completed without measured DuckDB spill and produced matching chunk contents. These results cover retained sorted chunks only and do not predict global-merge performance."
+}

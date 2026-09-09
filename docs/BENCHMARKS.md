@@ -1,5 +1,290 @@
 # Conversion Benchmarks
 
+## Geekbench 7 measured machine shootout
+
+The directly measured Geekbench 7 fleet includes macOS, Windows, Omarchy
+Linux, and Linux ARM systems. CPU scores use a common Geekbench 7 scale. GPU
+scores are shown with their API because Metal, CUDA, OpenCL, and Vulkan
+exercise different software stacks and should not be treated as perfectly
+interchangeable.
+
+| Machine | Platform | CPU single | CPU multi | Best GPU |
+|---|---|---:|---:|---:|
+| M5 Max MacBook Pro | macOS | **3,620** | **33,945** | 238,684 Metal |
+| Ryzen Mini PC, Windows profile | Windows 11 Pro | **2,055** | 9,635 | **297,964 CUDA** |
+| M1 Pro Mac | macOS | 2,024 | **11,715** | 61,431 Metal |
+| `lin-big-omarchy` | Omarchy Linux | 2,022 | 8,724 | 194,064 Vulkan |
+| `lin-omarchy` | Omarchy Linux | 1,855 | 6,866 | 11,714 Vulkan |
+| Ryzen Winbox, Windows profile | Windows 11 Pro | 1,781 | 6,653 | 11,521 Vulkan |
+| Celeron ASUS | Linux | 615 | 778 | 1,053 Vulkan |
+| UDM SE | Linux ARM Preview | 291 | 668 | Not supported |
+| QNAP TS-433 | Linux ARM Preview | 189 | 382 | Not supported |
+| Raspberry Pi 4 | Linux ARM Preview | No valid result | No valid result | Not supported |
+
+The M5 Max led CPU performance by a wide margin. It was 78.9% faster
+single-core and 189.8% faster multi-core than the measured M1 Pro, while its
+Metal GPU score was 3.89x higher. Against `lin-omarchy`, it was 1.95x
+single-core, 4.94x multi-core, and 20.38x higher in the cross-API Metal versus
+Vulkan GPU comparison.
+
+The selected `lin-big-omarchy` CPU retest scored 2,022 single-core and 8,724
+multi-core; its RTX 3090 scored 194,064 Vulkan. Against `lin-omarchy`, the
+Ryzen 5 5600X was 9.0% faster single-core and 27.1% faster multi-core. The RTX
+3090 was 16.57x the smaller machine's integrated Radeon Vulkan score.
+
+The Windows Ryzen Mini PC and `lin-big-omarchy` are the same physical
+Gigabyte B550I system with a Ryzen 5 5600X, 64 GB RAM, and an RTX 3090. The
+names distinguish operating-system profiles, not devices. Windows 11 Pro used
+the High performance power plan; Omarchy used the performance governor and
+performance EPP.
+
+The Windows profile was 1.6% higher single-core, 10.4% higher multi-core, and
+8.1% higher in the directly comparable Vulkan GPU test. Its 297,964 CUDA
+score remains the highest GPU number in the fleet, but it must not be used to
+claim that Windows was 53.5% faster than Linux: CUDA and Vulkan are different
+Geekbench backends. The equivalent Vulkan comparison is 209,874 versus
+194,064.
+
+The initial `lin-big-omarchy` CPU pass overlapped with other user activity and
+scored 1,988 / 8,250. After a 15-second idle wait, with the performance
+governor active, 52 GiB memory available, no swap in use, and a 0.78 one-minute
+load average, the retest improved single-core by 1.7% and multi-core by 5.7%.
+Both runs are retained; the cleaner 2,022 / 8,724 retest is used in the
+shootout.
+
+Against the directly measured M1 Pro Mac, `lin-omarchy` was 8.3% lower in
+single-core and 41.4% lower in multi-core. The M1 Pro's 61,431 Metal GPU score
+was 5.24x the Vega iGPU's 11,714 Vulkan score, but that ratio crosses graphics
+APIs.
+
+The Windows Ryzen Winbox and `lin-omarchy` are also two profiles of the same
+Lenovo 11JQS1M900, Ryzen 3 PRO 5350GE, 32 GB machine. Omarchy was 4.2% higher
+single-core, 3.2% higher multi-core, and 1.7% higher in Vulkan. The older
+Windows inventory recorded a 256 GB SATA drive and empty NVMe slot; the
+current Omarchy profile uses a 1 TB SK hynix NVMe, so the storage configuration
+was upgraded or the old inventory was incomplete.
+
+The Windows Ryzen profile retained the highest measured GPU score with
+297,964 CUDA,
+although that should not be ranked as a direct like-for-like result against
+the M5 Max's 238,684 Metal score. `lin-omarchy` was roughly 3.0x the Celeron
+node's single-core score, 8.8x its multi-core score, and 11.1x its Vulkan GPU
+score. The ARM appliance build was CPU-only; the Raspberry Pi 4 produced no
+valid score because it was OOM-killed during multi-core.
+
+The normalized shootout is tracked in
+[`docs/benchmarks/geekbench-7-measured-shootout.json`](benchmarks/geekbench-7-measured-shootout.json).
+The `lin-omarchy` node's sanitized console output, environment capture, and
+normalized result are retained under
+`out/geekbench/lin-omarchy/20260908T064800Z/` and on `lin-omarchy` at the
+matching repository-relative path. The equivalent `lin-big-omarchy` record is
+under `out/geekbench/lin-big-omarchy/20260908T070141Z/`, with its selected CPU
+retest under `out/geekbench/lin-big-omarchy/20260908T071139Z-cpu-retest/`.
+
+## Apple M5 Max 128 GB conversion and merge profile
+
+The imported M5 Max archive contains 595 compact artifacts from the optimized
+conversion sweep, complete May RC/RS processing, 25 full merge trials, and
+Geekbench 7. The original ZIP is retained under
+`out/benchmark-imports/m5-max/20260908T064431Z/` with SHA-256
+`52cca333c5e8b0c1e4aa35e1f66a887a6ed8cc63debf65f8b14d0c227b468710`.
+
+The host was an 18-core Apple M5 Max MacBook Pro with 128 GiB unified memory
+and a 2 TB internal Apple NVMe. It ran macOS 26.6.2 on AC power in High Power
+mode with Microsoft Defender enabled.
+
+### Optimized chunk conversion
+
+| Dataset | Chunk rows | Threads | DuckDB memory | Median total | Throughput |
+|---|---:|---:|---:|---:|---:|
+| Comments | 18M | 15 | 80 GB | 28.72 s | **626,676 rows/s** |
+| Submissions | 5M | 18 | 100 GB | 37.02 s | **135,073 rows/s** |
+
+The RC throughput plateau covered 14M through 18M rows; 16M retained 99% of
+peak throughput with a smaller retry unit. RS peaked more clearly at 5M and
+slowed at 5.5M and 6M. Compared with the repository's 6M/1.5M, 12-thread,
+25 GB profile, the selected RC profile improved throughput by 14.4% and the RS
+profile by 50.9%.
+
+The staged threaded decoder was faster than direct DuckDB Zstandard ingestion
+on this machine. At the matched 12-thread/25 GB setting, staging reduced RC
+time by 45.9% and RS time by 24.2%.
+
+### Complete May processing
+
+| Dataset | Rows | Chunks | Conversion work | Best merge | Conversion + merge | Final size |
+|---|---:|---:|---:|---:|---:|---:|
+| Comments | 349,577,451 | 20 | 9m 27s | 5m 25s | **14m 52s** | 43.33 GiB |
+| Submissions | 47,453,180 | 10 | 6m 08s | 4m 24s | **10m 32s** | 25.73 GiB |
+
+The winning RC merge used 12 threads and 80 GB. The winning RS merge used nine
+threads and 64 GB. More resources were not automatically better: the RC
+100 GB merge was 30.0% slower than the winner and added 5.76 GiB of swap, while
+the RS 100 GB run was 19.4% slower and added 0.69 GiB.
+
+Relative to `lin-omarchy`, the M5 Max's conversion-plus-merge totals were
+approximately **5.57x faster for comments** and **5.00x faster for
+submissions**. Its chunk-conversion throughput was about 4.03x the matched
+`lin-big-omarchy` RC rate and 4.05x its RS rate. These comparisons use
+different host-specific resource profiles and describe delivered throughput,
+not equal-resource CPU efficiency.
+
+The full normalized profile is tracked in
+[`docs/benchmarks/RC_RS_2026-05-m5-max-profile.json`](benchmarks/RC_RS_2026-05-m5-max-profile.json).
+Every retained output passed its source-hash, row-count, schema, content, and
+physical sort-order validation. Cross-host fingerprint equality was not
+asserted because the M5 and Linux full-month harnesses used different schema
+projection and fingerprint implementations.
+
+## Full May 2026 Linux chunk-and-merge run
+
+The complete May comment and submission archives were processed on the Ryzen
+3 PRO 5350GE (4 cores / 8 threads, 30.7 GiB usable RAM), Linux 7.1.9, and the
+internal SK hynix SHGP31 NVMe. Source, chunks, scratch, and final output used
+encrypted Btrfs with `compress=zstd:3`. The upstream base was `b44c6d8`, with
+the local `benchmarks.full_pipeline` and `benchmarks.merge_tuning` harnesses.
+Python was 3.14.7 and DuckDB 1.5.2. No fleet, transfer, or full-file streamed
+engine was used.
+
+The production bounded threaded Zstandard reader staged exact source-line
+chunks using binary blocks. DuckDB's Python API normalized and sorted each
+chunk using the master schema. Missing canonical columns were padded before
+merging, so identical chunk schemas did not require `union_by_name=true`.
+Both phases used four DuckDB threads and ZSTD Parquet with a 100,000-row-group
+request. Chunk memory was 24 decimal GB; the selected merge memory was 16 GB.
+All chunks and both tested final-output variants were retained.
+
+### Complete processing results: recommended 16 GB merge profile
+
+| Dataset | Source rows | Chunks | Staging | Chunk conversion | Global merge | Processing total | Final size |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Comments | 349,577,451 | 59 x up to 6M | 18.93 min | 29.99 min | **33.79 min** | **82.71 min** | 43.58 GiB |
+| Submissions | 47,453,180 | 32 x up to 1.5M | 7.28 min | 22.58 min | **22.73 min** | **52.59 min** | 25.86 GiB |
+
+Processing totals exclude source hashing, output validation, the separate
+tuning experiments, and the initial 20 GB merge trials. Adding chunk and final
+validation yields 89.22 and 55.22 minutes respectively. These are single full
+archive observations, not repeated medians. The original source files were
+unchanged.
+
+Neither chunk-conversion workload spilled. Peak chunk RSS was 17.37 GiB for
+comments and 19.10 GiB for submissions. The selected final output sizes were
+46,794,757,375 and 27,769,717,001 bytes, respectively: 11.68% and 4.60% smaller
+than their retained chunk datasets.
+
+### Merge memory: more RAM was not always faster
+
+| Dataset | DuckDB limit | Full merge | Peak process RSS | Peak logical spill | Minimum available RAM | Host swap-out during merge |
+|---|---:|---:|---:|---:|---:|---:|
+| Comments | 20 GB | 37.44 min | 24.30 GiB | 321.03 GiB | 2.29 GiB | 12.65 GiB |
+| Comments | **16 GB** | **33.79 min** | **22.10 GiB** | **314.68 GiB** | **4.41 GiB** | **0** |
+| Submissions | 20 GB | 21.87 min | 26.28 GiB | 138.64 GiB | 0.23 GiB | 19.93 GiB |
+| Submissions | **16 GB** | **22.73 min** | **20.84 GiB** | **173.21 GiB** | **5.91 GiB** | **0** |
+
+The 16 GB setting made the comment merge 9.7% faster. Submissions were 4.0%
+slower but retained substantially more memory headroom and avoided new OS
+swap-out. Use 16 GB on this shared 32 GB-class machine. The configured DuckDB
+limit is not a process-RSS ceiling. This experiment used a fixed 20-then-16
+execution order, so cache and other host activity were not fully controlled.
+These observations do not establish an optimal limit for every host.
+
+Spill and RSS were sampled every second. Spill is the sum of logical file sizes,
+not allocated NVMe bytes; Btrfs compression changes physical usage. Swap counters
+are host-wide and include other processes. Existing inactive swap remained in
+use during the 16 GB runs; zero swap-out does not mean swap was disabled.
+
+### Merge thread calibration
+
+The first four retained chunks were merged with one and four threads, using
+20 GB memory and identical output settings. Two runs per configuration used
+order 1,4,4,1, with no cache flushing and no concurrent conversion.
+
+| Dataset sample | Rows | One-thread median | Four-thread median | Speedup |
+|---|---:|---:|---:|---:|
+| Comments | 24,000,000 | 234.15 s | 120.21 s | **1.95x** |
+| Submissions | 6,000,000 | 225.33 s | 136.20 s | **1.65x** |
+
+These are subset speedups, not measured full-month single-thread speedups.
+The complete dataset was merged with four threads. DuckDB's native parallel
+streaming k-way sort was retained rather than adding Python per-row merging or
+pairwise rewrite passes; see the [full benchmark rationale](../benchmarks/README.md).
+
+### Correctness and artifacts
+
+Each source SHA-256 matched the canonical handoff. Every chunk matched its exact
+staged source row count. Both full merge variants matched the retained chunks'
+canonical schemas, per-column non-null counts, and two order-independent
+full-row fingerprints (XOR and sum). Physical global ordering was checked in
+bounded Arrow batches. Full-row fingerprints also matched between the 16 GB and
+20 GB outputs; file byte sizes can differ because sort ties and encoding can
+produce different physical layouts.
+
+The benchmark host retains the raw run under
+`out/full-pipeline/20260908-full-may-linux/`: `summary.json` consolidates the
+run, the base dataset directories retain all chunks and the 20 GB output, and
+the `RC_2026-05-merge16` / `RS_2026-05-merge16` directories contain the
+recommended final outputs. Per-dataset `result.json`, `phases.jsonl`,
+`telemetry.jsonl`, DuckDB query profiles, environment captures, and logs
+preserve detailed measurements. Large generated artifacts remain ignored by
+Git; the normalized machine profile is tracked in
+[`docs/benchmarks/RC_RS_2026-05-omarchy-full-pipeline.json`](benchmarks/RC_RS_2026-05-omarchy-full-pipeline.json).
+
+## Matched `lin-big-omarchy` chunking comparison
+
+The complete May archives were processed again on `lin-big-omarchy`, an
+Omarchy 4.0.2 host with a Ryzen 5 5600X, 6 physical cores, 64 GiB RAM, and a
+Sabrent NVMe using encrypted Btrfs with `compress=zstd:3`. The comparison
+deliberately retained the smaller host's four-thread and 24 GB limits, the same
+chunk sizes, Python 3.14.7, DuckDB 1.5.2, Python Zstandard 0.25.0, sort keys,
+row-group request, and compression settings.
+
+| Dataset | Host | Staging | Chunk conversion | Validation | Chunking total | Throughput |
+|---|---|---:|---:|---:|---:|---:|
+| Comments | `lin-big-omarchy` | 15.25 min | 22.85 min | 2.43 min | **38.10 min** | **152,923 rows/s** |
+| Comments | `lin-omarchy` | 18.93 min | 29.99 min | 3.31 min | 48.92 min | 119,098 rows/s |
+| Submissions | `lin-big-omarchy` | 5.80 min | 19.00 min | 1.02 min | **24.79 min** | **31,901 rows/s** |
+| Submissions | `lin-omarchy` | 7.28 min | 22.58 min | 1.33 min | 29.86 min | 26,487 rows/s |
+
+`lin-big-omarchy` was **1.284x faster for comments** and **1.204x faster for
+submissions**, reducing chunking wall time by 22.12% and 16.97%. Peak RSS was
+17.02 GiB for comments and 18.57 GiB for submissions, and neither workload
+spilled. Average process CPU use including validation was 2.75 and 2.29 cores,
+so these measurements do not establish how either host scales beyond four
+configured DuckDB threads.
+
+Both machines processed identical source hashes and row counts. Every one of
+the 59 RC and 32 RS output chunks matched its reference content. Output byte
+sizes differed by only 120,183 bytes for RC and 68,597 bytes for RS; Parquet
+encoding and equal-key row ordering can produce byte-level differences without
+changing content.
+
+This comparison covers source staging, per-chunk normalization and sorting,
+Parquet creation, and validation. It does not include a global merge and must
+not be used to predict merge scaling. The raw local profiles and telemetry are
+under `out/benchmark-2026-05-lin-big-omarchy/results-clean/`; the normalized
+result is tracked in
+[`docs/benchmarks/RC_RS_2026-05-lin-big-omarchy-chunking.json`](benchmarks/RC_RS_2026-05-lin-big-omarchy-chunking.json).
+
+### `lin-big-omarchy` four-versus-six-thread follow-up
+
+A matched 6M-comment test compared four and six threads at the same 24 GB
+memory limit, using three repetitions per profile:
+
+| Threads | Median stage | Median Parquet | Median total | Throughput |
+|---:|---:|---:|---:|---:|
+| 4 | 15.32 s | 20.72 s | 36.11 s | 166,146 rows/s |
+| **6** | **15.11 s** | **19.02 s** | **34.18 s** | **175,532 rows/s** |
+
+Six threads increased median throughput by **5.65%** and reduced elapsed time
+by **5.35%**. Staging improved only 1.4%, within likely run noise; the
+DuckDB/Parquet phase improved 8.22%. All six outputs contained 6,000,000 rows,
+shared the same content fingerprint, and had zero physical sort-order
+violations. Six threads are better than four for this workload, but a wider
+sweep is still required to determine whether six is optimal.
+
+The normalized comparison is tracked in
+[`docs/benchmarks/RC_2026-05-lin-big-omarchy-thread-sweep.json`](benchmarks/RC_2026-05-lin-big-omarchy-thread-sweep.json).
+
 This document records conversion measurements used to choose the chunking and
 sorting strategy. Generated Parquet files and full logs are intentionally not
 tracked; the compact raw results are in
@@ -15,6 +300,12 @@ The native-NVMe 4M/6M follow-up is in
 [`docs/benchmarks/RC_2026-05-linux-nvme-chunks.json`](benchmarks/RC_2026-05-linux-nvme-chunks.json).
 The post-reinstall Omarchy RC/RS threaded-decoder suite is in
 [`docs/benchmarks/RC_RS_2026-05-omarchy-suite.json`](benchmarks/RC_RS_2026-05-omarchy-suite.json).
+The complete Omarchy chunk-and-merge machine profile is in
+[`docs/benchmarks/RC_RS_2026-05-omarchy-full-pipeline.json`](benchmarks/RC_RS_2026-05-omarchy-full-pipeline.json).
+The matched larger-host chunking comparison is in
+[`docs/benchmarks/RC_RS_2026-05-lin-big-omarchy-chunking.json`](benchmarks/RC_RS_2026-05-lin-big-omarchy-chunking.json).
+The larger host's four-versus-six-thread follow-up is in
+[`docs/benchmarks/RC_2026-05-lin-big-omarchy-thread-sweep.json`](benchmarks/RC_2026-05-lin-big-omarchy-thread-sweep.json).
 Use the tracked [`benchmarks.conversion`](../benchmarks/README.md) harness to
 rerun the staged or direct conversion paths on macOS, Windows, or Linux. It
 captures environment metadata and validates source hashes, row counts,

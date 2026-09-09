@@ -285,6 +285,70 @@ Use fast local SSD storage for source, output, and spill. Size the filesystem
 for the final output plus the peak spill allowance; do not count the spill
 allowance as permanent dataset storage.
 
+### Full-archive merge profile on a shared 32 GB host
+
+The complete May 2026 RC and RS archives were also merged on the four-core
+`lin-omarchy` host. Four merge threads were 1.95x faster than one thread for a
+24M-row RC subset and 1.65x faster for a 6M-row RS subset. These are subset
+measurements, not full-month single-thread estimates.
+
+For a requested global merge, use a 16 GB DuckDB limit on this shared host.
+Compared with 20 GB, the 16 GB profile reduced the RC merge from 37.44 to
+33.79 minutes and avoided 12.65 GiB of host swap-out. The RS merge increased
+from 21.87 to 22.73 minutes, but avoided 19.93 GiB of swap-out and kept at
+least 5.91 GiB available. DuckDB's configured limit is not a process-RSS
+ceiling: peak RSS still reached 22.10 GiB for RC and 20.84 GiB for RS.
+
+The selected full processing totals were 82.71 minutes for 349,577,451
+comments and 52.59 minutes for 47,453,180 submissions. Chunk conversion did
+not spill; the global merges spilled 314.68 and 173.21 GiB logically. These
+were single observations on compressed Btrfs, and the 20 GB runs always
+preceded the 16 GB runs, so treat 16 GB as a safe machine profile rather than
+a universal optimum. Retained sorted chunks remain preferable when a single
+globally sorted file is not required.
+
+### Scaling the same chunk profile to a larger host
+
+Keeping the four-thread, 24 GB, 6M RC, and 1.5M RS settings unchanged,
+`lin-big-omarchy` completed full-month chunking 1.284x faster for comments and
+1.204x faster for submissions than `lin-omarchy`. Wall time fell from 48.92 to
+38.10 minutes for RC and from 29.86 to 24.79 minutes for RS. Both machines used
+the same Omarchy, kernel, Python, DuckDB, Zstandard, Btrfs compression, source
+hashes, and output settings, and all 91 chunks matched by content.
+
+The larger host has a Ryzen 5 5600X and 64 GiB RAM, versus a Ryzen 3 PRO 5350GE
+and 32 GiB RAM. Neither run spilled, peak RSS stayed below 19 GiB, and average
+CPU use remained below three cores despite a four-thread DuckDB limit. The
+observed gain therefore describes this complete pipeline on these hosts; it
+does not isolate CPU architecture, cache, memory bandwidth, storage, or
+background activity.
+
+A controlled follow-up showed that six threads help the 5600X on 6M comment
+chunks. At the same 24 GB limit, the three-run median improved from 166,146 to
+175,532 rows/s, a 5.65% gain. Staging was effectively unchanged while the
+DuckDB/Parquet phase became 8.22% faster. Six threads are the better of the two
+measured settings, but do not treat that as the final optimum until higher
+thread counts are tested.
+
+### Scaling to an M5 Max with 128 GiB
+
+The M5 Max required different conversion and merge profiles. RC conversion
+peaked at 18M rows, 15 threads, and 80 GB, while RS peaked at 5M rows, all 18
+physical cores, and 100 GB. A balanced RC profile uses 16M rows because it
+remained within 1% of peak throughput with a smaller retry unit.
+
+Merge resources should be tuned independently from chunk conversion. The
+complete RC merge was fastest at 12 threads and 80 GB; RS was fastest at nine
+threads and 64 GB. Increasing either workload to a 100 GB merge limit raised
+process RSS to roughly 96 GiB, caused system swap growth, and slowed the merge.
+Large-memory machines still need headroom outside DuckDB's buffer manager.
+
+Complete conversion work plus the median winning merge took 14.87 minutes for
+349.6M comments and 10.53 minutes for 47.5M submissions. This was roughly
+5.57x and 5.00x faster than the corresponding `lin-omarchy` totals, but the
+hosts used intentionally different resource profiles. Treat these as
+machine-level capacity results, not per-core architecture comparisons.
+
 ## Schema and data robustness
 
 - Use a fixed schema rather than inferring every chunk independently.

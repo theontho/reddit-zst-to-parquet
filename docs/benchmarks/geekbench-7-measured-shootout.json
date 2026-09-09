@@ -1,0 +1,239 @@
+{
+  "benchmark_date": "2026-09-08",
+  "benchmark": "Geekbench 7 measured machine shootout",
+  "benchmark_version": 1,
+  "geekbench_version": "7.0.0",
+  "scope": "Directly measured machines only. CPU scores are comparable within Geekbench 7. GPU scores retain their API because Metal, CUDA, OpenCL, and Vulkan results are not perfectly interchangeable.",
+  "machines": [
+    {
+      "name": "M5 Max MacBook Pro",
+      "platform": "macOS",
+      "model": "MacBook Pro Mac17,6",
+      "cpu": "Apple M5 Max",
+      "cpu_single_core": 3620,
+      "cpu_multi_core": 33945,
+      "gpu": "Apple M5 Max 40-core GPU",
+      "gpu_scores": {
+        "Metal": 238684
+      },
+      "gpu_best_score": 238684,
+      "gpu_best_api": "Metal",
+      "cpu_result_url": "https://browser.geekbench.com/v7/cpu/297118",
+      "gpu_result_url": "https://browser.geekbench.com/v7/gpu/141082",
+      "raw_results": "out/benchmark-imports/m5-max/20260908T064431Z/extracted/reddit-zst-benchmark/results/Mac-M5-MS/geekbench-7-20260908"
+    },
+    {
+      "name": "Ryzen Mini PC (Windows)",
+      "platform": "Windows 11 Pro",
+      "model": "Gigabyte B550I AORUS PRO AX",
+      "cpu": "AMD Ryzen 5 5600X",
+      "cpu_single_core": 2055,
+      "cpu_multi_core": 9635,
+      "gpu": "NVIDIA GeForce RTX 3090",
+      "gpu_scores": {
+        "CUDA": 297964,
+        "OpenCL": 187778,
+        "Vulkan": 209874
+      },
+      "gpu_best_score": 297964,
+      "gpu_best_api": "CUDA",
+      "cpu_result_url": "https://browser.geekbench.com/v7/cpu/276182",
+      "gpu_result_urls": {
+        "CUDA": "https://browser.geekbench.com/v7/gpu/132076",
+        "OpenCL": "https://browser.geekbench.com/v7/gpu/132083",
+        "Vulkan": "https://browser.geekbench.com/v7/gpu/132090"
+      },
+      "power_profile": "Windows High performance",
+      "same_hardware_as": "lin-big-omarchy"
+    },
+    {
+      "name": "M1 Pro Mac",
+      "platform": "macOS",
+      "cpu_single_core": 2024,
+      "cpu_multi_core": 11715,
+      "gpu_scores": {
+        "Metal": 61431,
+        "OpenCL": 35576
+      },
+      "gpu_best_score": 61431,
+      "gpu_best_api": "Metal"
+    },
+    {
+      "name": "lin-omarchy",
+      "platform": "Omarchy Linux",
+      "model": "LENOVO 11JQS1M900",
+      "cpu": "AMD Ryzen 3 PRO 5350GE",
+      "cpu_single_core": 1855,
+      "cpu_multi_core": 6866,
+      "gpu": "AMD Radeon Graphics (RADV RENOIR)",
+      "gpu_scores": {
+        "Vulkan": 11714
+      },
+      "gpu_best_score": 11714,
+      "gpu_best_api": "Vulkan",
+      "cpu_result_url": "https://browser.geekbench.com/v7/cpu/297110",
+      "gpu_result_url": "https://browser.geekbench.com/v7/gpu/141083",
+      "raw_results": "out/geekbench/lin-omarchy/20260908T064800Z",
+      "same_hardware_as": "Ryzen Winbox (Windows)",
+      "selection_note": "The Omarchy result reflects the current 1 TB NVMe configuration; the older Windows inventory recorded a 256 GB SATA drive."
+    },
+    {
+      "name": "lin-big-omarchy",
+      "platform": "Omarchy Linux",
+      "model": "Gigabyte B550I AORUS PRO AX",
+      "cpu": "AMD Ryzen 5 5600X",
+      "cpu_single_core": 2022,
+      "cpu_multi_core": 8724,
+      "gpu": "NVIDIA GeForce RTX 3090",
+      "gpu_scores": {
+        "Vulkan": 194064
+      },
+      "gpu_best_score": 194064,
+      "gpu_best_api": "Vulkan",
+      "cpu_result_url": "https://browser.geekbench.com/v7/cpu/297204",
+      "gpu_result_url": "https://browser.geekbench.com/v7/gpu/141100",
+      "raw_results": "out/geekbench/lin-big-omarchy/20260908T070141Z",
+      "cpu_retest": "out/geekbench/lin-big-omarchy/20260908T071139Z-cpu-retest",
+      "same_hardware_as": "Ryzen Mini PC (Windows)",
+      "initial_cpu_scores": {
+        "single_core": 1988,
+        "multi_core": 8250
+      },
+      "selection_note": "The idle retest is selected because the initial run overlapped with other user activity."
+    },
+    {
+      "name": "Ryzen Winbox (Windows)",
+      "platform": "Windows 11 Pro",
+      "model": "LENOVO 11JQS1M900",
+      "cpu": "AMD Ryzen 3 PRO 5350GE",
+      "cpu_single_core": 1781,
+      "cpu_multi_core": 6653,
+      "gpu": "Integrated AMD Radeon Graphics",
+      "gpu_scores": {
+        "OpenCL": 10177,
+        "Vulkan": 11521
+      },
+      "gpu_best_score": 11521,
+      "gpu_best_api": "Vulkan",
+      "cpu_result_url": "https://browser.geekbench.com/v7/cpu/276192",
+      "gpu_result_urls": {
+        "OpenCL": "https://browser.geekbench.com/v7/gpu/132091",
+        "Vulkan": "https://browser.geekbench.com/v7/gpu/132097"
+      },
+      "power_profile": "Windows Balanced",
+      "same_hardware_as": "lin-omarchy",
+      "storage_at_windows_inventory": "256 GB SATA; NVMe slot was empty"
+    },
+    {
+      "name": "Celeron ASUS",
+      "platform": "Linux",
+      "cpu_single_core": 615,
+      "cpu_multi_core": 778,
+      "gpu_scores": {
+        "Vulkan": 1053
+      },
+      "gpu_best_score": 1053,
+      "gpu_best_api": "Vulkan"
+    },
+    {
+      "name": "UDM SE",
+      "platform": "Linux ARM Preview",
+      "cpu_single_core": 291,
+      "cpu_multi_core": 668,
+      "gpu_scores": {},
+      "gpu_best_score": null,
+      "gpu_best_api": null
+    },
+    {
+      "name": "QNAP TS-433",
+      "platform": "Linux ARM Preview",
+      "cpu_single_core": 189,
+      "cpu_multi_core": 382,
+      "gpu_scores": {},
+      "gpu_best_score": null,
+      "gpu_best_api": null
+    },
+    {
+      "name": "Raspberry Pi 4",
+      "platform": "Linux ARM Preview",
+      "cpu_single_core": null,
+      "cpu_multi_core": null,
+      "gpu_scores": {},
+      "gpu_best_score": null,
+      "gpu_best_api": null,
+      "status": "No valid result; the process was OOM-killed during multi-core."
+    }
+  ],
+  "m5_max_comparisons": {
+    "vs_m1_pro_mac": {
+      "single_core_percent": 78.9,
+      "multi_core_percent": 189.8,
+      "metal_percent": 288.5
+    },
+    "vs_lin_omarchy": {
+      "single_core_percent": 95.1,
+      "multi_core_percent": 394.4,
+      "best_gpu_percent": 1937.6,
+      "gpu_caveat": "Metal compared with Vulkan."
+    }
+  },
+  "lin_omarchy_comparisons": {
+    "vs_m1_pro_mac": {
+      "single_core_percent": -8.3,
+      "multi_core_percent": -41.4,
+      "best_gpu_percent": -80.9,
+      "gpu_caveat": "Vulkan compared with Metal."
+    },
+    "vs_ryzen_mini_pc": {
+      "single_core_percent": -9.7,
+      "multi_core_percent": -28.7,
+      "best_gpu_percent": -96.1,
+      "gpu_caveat": "Vulkan compared with CUDA."
+    },
+    "vs_ryzen_winbox": {
+      "single_core_percent": 4.2,
+      "multi_core_percent": 3.2,
+      "vulkan_percent": 1.7
+    },
+    "vs_celeron_asus": {
+      "single_core_percent": 201.6,
+      "multi_core_percent": 782.5,
+      "vulkan_percent": 1012.4
+    }
+  },
+  "lin_big_omarchy_comparisons": {
+    "vs_lin_omarchy": {
+      "single_core_percent": 9.0,
+      "multi_core_percent": 27.1,
+      "vulkan_percent": 1556.7
+    },
+    "vs_ryzen_mini_pc": {
+      "single_core_percent": -1.6,
+      "multi_core_percent": -9.5,
+      "vulkan_percent": -7.5,
+      "note": "Same physical Ryzen 5 5600X, 64 GB, RTX 3090 machine: Omarchy Linux compared with the earlier Windows 11 Pro run."
+    },
+    "vs_m5_max": {
+      "single_core_percent": -44.1,
+      "multi_core_percent": -74.3,
+      "gpu_caveat": "RTX 3090 Vulkan compared with M5 Max Metal."
+    }
+  },
+  "source": {
+    "prior_shootout_record": "node-benchmark/results/2026-09-04/geekbench-7/results.json",
+    "ryzen_mini_pc_windows_cpu": "https://browser.geekbench.com/v7/cpu/276182",
+    "ryzen_mini_pc_windows_cuda": "https://browser.geekbench.com/v7/gpu/132076",
+    "ryzen_mini_pc_windows_opencl": "https://browser.geekbench.com/v7/gpu/132083",
+    "ryzen_mini_pc_windows_vulkan": "https://browser.geekbench.com/v7/gpu/132090",
+    "ryzen_winbox_windows_cpu": "https://browser.geekbench.com/v7/cpu/276192",
+    "ryzen_winbox_windows_opencl": "https://browser.geekbench.com/v7/gpu/132091",
+    "ryzen_winbox_windows_vulkan": "https://browser.geekbench.com/v7/gpu/132097",
+    "m5_max_cpu": "https://browser.geekbench.com/v7/cpu/297118",
+    "m5_max_gpu": "https://browser.geekbench.com/v7/gpu/141082",
+    "lin_omarchy_cpu": "https://browser.geekbench.com/v7/cpu/297110",
+    "lin_omarchy_gpu": "https://browser.geekbench.com/v7/gpu/141083",
+    "lin_big_omarchy_cpu_initial": "https://browser.geekbench.com/v7/cpu/297163",
+    "lin_big_omarchy_cpu_selected": "https://browser.geekbench.com/v7/cpu/297204",
+    "lin_big_omarchy_gpu": "https://browser.geekbench.com/v7/gpu/141100"
+  }
+}

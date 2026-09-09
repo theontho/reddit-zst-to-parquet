@@ -1,0 +1,725 @@
+{
+  "benchmark_date": "2026-09-08",
+  "benchmark": "Apple M5 Max 128 GB conversion, merge, and Geekbench profile",
+  "benchmark_version": 1,
+  "archive": {
+    "filename": "reddit-zst-benchmark-complete-20260908T064431Z.zip",
+    "sha256": "52cca333c5e8b0c1e4aa35e1f66a887a6ed8cc63debf65f8b14d0c227b468710",
+    "files": 595,
+    "uncompressed_bytes": 10223051,
+    "local_root": "out/benchmark-imports/m5-max/20260908T064431Z"
+  },
+  "source_record_hashes": {
+    "full_month_summary_sha256": "ccdd16ff71a8ff6c5f42f008f14b6d146eb06d98791f0266e118b45fd7b52c7f",
+    "optimization_report_sha256": "6a6fdbed48167084b64aafa833b952f5e1dd1809d00cc740b8e85ab0382843e6",
+    "geekbench_scores_sha256": "4a49e57a8bb7910f544a1a11fe0e5e0872fdfacb16d2349f5a1892f7d4039385"
+  },
+  "system": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M5 Max",
+    "physical_cores": 18,
+    "logical_cores": 18,
+    "memory_bytes": 137438953472,
+    "python": "3.12.13",
+    "duckdb": "1.5.2",
+    "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+    "python_zstandard": "0.25.0",
+    "python_zstandard_libzstd": "1.5.7",
+    "git": {
+      "commit": "b44c6d8745e36fd510b08b67af0a7e5a6c7e8e69",
+      "dirty": true
+    },
+    "model": "MacBook Pro Mac17,6",
+    "gpu_cores": 40,
+    "storage": "2 TB internal Apple NVMe",
+    "power": "AC, High Power mode",
+    "protection": "Microsoft Defender enabled"
+  },
+  "optimized_chunk_profiles": {
+    "RC": {
+      "configuration": {
+        "rows": 18000000,
+        "repetitions": 3,
+        "warmups": 0,
+        "threads": 15,
+        "memory_limit_gb": 80,
+        "max_temp_bytes": 667426452480,
+        "mode": "staged",
+        "copy_mode": "block",
+        "decoder": "python-threaded",
+        "binary_block_bytes": 8388608,
+        "compression": "ZSTD",
+        "sort": [
+          "author",
+          "subreddit",
+          "created_utc"
+        ],
+        "schema_inference_seconds_excluded": 0.27046329202130437,
+        "metadata": {
+          "protection": "enabled",
+          "power_source": "ac"
+        }
+      },
+      "summary": {
+        "median_stage_seconds": 19.369411124964245,
+        "median_parquet_seconds": 9.444617583998479,
+        "median_total_seconds": 28.72298724995926,
+        "median_rows_per_second": 626675.7647230976
+      },
+      "validation": {
+        "rows": 18000000,
+        "content_fingerprint": 10847231655099589270,
+        "schemas_equal": true,
+        "physical_sort_order": true,
+        "expected_source_sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+        "source_sha256_matched": true
+      },
+      "balanced_alternative": {
+        "rows": 16000000,
+        "threads": 15,
+        "memory_limit_gb": 80,
+        "reason": "Within 1% of peak RC throughput with a smaller retry unit."
+      }
+    },
+    "RS": {
+      "configuration": {
+        "rows": 5000000,
+        "repetitions": 3,
+        "warmups": 0,
+        "threads": 18,
+        "memory_limit_gb": 100,
+        "max_temp_bytes": 667413943296,
+        "mode": "staged",
+        "copy_mode": "block",
+        "decoder": "python-threaded",
+        "binary_block_bytes": 8388608,
+        "compression": "ZSTD",
+        "sort": [
+          "author",
+          "subreddit",
+          "created_utc"
+        ],
+        "schema_inference_seconds_excluded": 2.885904374998063,
+        "metadata": {
+          "protection": "enabled",
+          "power_source": "ac"
+        }
+      },
+      "summary": {
+        "median_stage_seconds": 15.666289249958936,
+        "median_parquet_seconds": 21.32324704201892,
+        "median_total_seconds": 37.01701225101715,
+        "median_rows_per_second": 135073.0298300239
+      },
+      "validation": {
+        "rows": 5000000,
+        "content_fingerprint": 18101870552233585273,
+        "schemas_equal": true,
+        "physical_sort_order": true,
+        "expected_source_sha256": "83f25791b1d7cf8663a5c5cea46d291924adf2e00ba02b450c564711725ffcef",
+        "source_sha256_matched": true
+      }
+    }
+  },
+  "direct_path_comparison": {
+    "RC_6M_12_threads_25GB": {
+      "staged_seconds": 10.95,
+      "direct": {
+        "median_total_seconds": 20.227613332972396,
+        "median_rows_per_second": 296624.2186476636
+      },
+      "staged_time_reduction_percent": 45.9
+    },
+    "RS_1_5M_12_threads_25GB": {
+      "staged_seconds": 16.75,
+      "direct": {
+        "median_total_seconds": 22.108707792009227,
+        "median_rows_per_second": 67846.57041521651
+      },
+      "staged_time_reduction_percent": 24.2
+    }
+  },
+  "full_month": {
+    "generated_utc": "2026-09-08T05:20:23.833919+00:00",
+    "artifact_root": "/Users/mac/src/reddit-zst-benchmark/reddit-zst-to-parquet/out/full-month-benchmark/20260908",
+    "datasets": {
+      "RC": {
+        "total_rows": 349577451,
+        "chunk_count": 20,
+        "chunk_configuration": {
+          "command": "chunks",
+          "output": "/Users/mac/src/reddit-zst-benchmark/reddit-zst-to-parquet/out/full-month-benchmark/20260908/RC/chunks",
+          "threads": 15,
+          "memory": 80,
+          "source": "/Users/mac/benchmark-data/reddit-zst-benchmark/data/comments/RC_2026-05.zst",
+          "sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+          "rows": 18000000
+        },
+        "chunk_conversion_seconds": 566.9972345021088,
+        "chunk_wall_seconds_including_validation": 850.4204942919896,
+        "chunk_throughput_rows_per_second": 616541.7214194541,
+        "chunk_peak_rss_bytes": 52233551872,
+        "chunk_peak_spill_bytes": 0,
+        "chunks_bytes": 50840348231,
+        "best_merge": {
+          "threads": 12,
+          "memory_limit_gb": 80,
+          "repetitions": 3,
+          "median_seconds": 324.60770379099995,
+          "min_seconds": 313.4081742919516,
+          "max_seconds": 348.42540233401814,
+          "run_seconds": [
+            348.42540233401814,
+            313.4081742919516,
+            324.60770379099995
+          ],
+          "rows_per_second": 1076922.8423028337,
+          "peak_rss_bytes": 88365957120,
+          "peak_spill_bytes": 287208996864,
+          "max_swap_growth_bytes": 0
+        },
+        "merge_profiles": [
+          {
+            "threads": 12,
+            "memory_limit_gb": 80,
+            "repetitions": 3,
+            "median_seconds": 324.60770379099995,
+            "min_seconds": 313.4081742919516,
+            "max_seconds": 348.42540233401814,
+            "run_seconds": [
+              348.42540233401814,
+              313.4081742919516,
+              324.60770379099995
+            ],
+            "rows_per_second": 1076922.8423028337,
+            "peak_rss_bytes": 88365957120,
+            "peak_spill_bytes": 287208996864,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 9,
+            "memory_limit_gb": 80,
+            "repetitions": 3,
+            "median_seconds": 352.7776617910131,
+            "min_seconds": 341.6777590829879,
+            "max_seconds": 353.75634416699177,
+            "run_seconds": [
+              353.75634416699177,
+              352.7776617910131,
+              341.6777590829879
+            ],
+            "rows_per_second": 990928.533357906,
+            "peak_rss_bytes": 92546744320,
+            "peak_spill_bytes": 283374911488,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 18,
+            "memory_limit_gb": 80,
+            "repetitions": 1,
+            "median_seconds": 375.3770758329774,
+            "min_seconds": 375.3770758329774,
+            "max_seconds": 375.3770758329774,
+            "run_seconds": [
+              375.3770758329774
+            ],
+            "rows_per_second": 931270.1107926557,
+            "peak_rss_bytes": 81338318848,
+            "peak_spill_bytes": 299512266752,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 6,
+            "memory_limit_gb": 80,
+            "repetitions": 1,
+            "median_seconds": 394.3571841249941,
+            "min_seconds": 394.3571841249941,
+            "max_seconds": 394.3571841249941,
+            "run_seconds": [
+              394.3571841249941
+            ],
+            "rows_per_second": 886448.7958439199,
+            "peak_rss_bytes": 88865456128,
+            "peak_spill_bytes": 275320864768,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 12,
+            "memory_limit_gb": 64,
+            "repetitions": 1,
+            "median_seconds": 414.167818582966,
+            "min_seconds": 414.167818582966,
+            "max_seconds": 414.167818582966,
+            "run_seconds": [
+              414.167818582966
+            ],
+            "rows_per_second": 844047.835961868,
+            "peak_rss_bytes": 78939291648,
+            "peak_spill_bytes": 300209635328,
+            "max_swap_growth_bytes": 143392768
+          },
+          {
+            "threads": 15,
+            "memory_limit_gb": 80,
+            "repetitions": 1,
+            "median_seconds": 414.90828041697387,
+            "min_seconds": 414.90828041697387,
+            "max_seconds": 414.90828041697387,
+            "run_seconds": [
+              414.90828041697387
+            ],
+            "rows_per_second": 842541.5145937367,
+            "peak_rss_bytes": 83553452032,
+            "peak_spill_bytes": 295271661568,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 12,
+            "memory_limit_gb": 100,
+            "repetitions": 1,
+            "median_seconds": 421.95692687504925,
+            "min_seconds": 421.95692687504925,
+            "max_seconds": 421.95692687504925,
+            "run_seconds": [
+              421.95692687504925
+            ],
+            "rows_per_second": 828467.1461348414,
+            "peak_rss_bytes": 103137492992,
+            "peak_spill_bytes": 278553788416,
+            "max_swap_growth_bytes": 6180896768
+          }
+        ],
+        "summed_conversion_and_median_merge_seconds": 891.6049382931087,
+        "final_file": "/Users/mac/src/reddit-zst-benchmark/reddit-zst-to-parquet/out/full-month-benchmark/20260908/final/RC_2026-05.parquet",
+        "final_bytes": 46525061305,
+        "final_sha256": "bd4644c91ecaf4aa8876f451d03ef124f26ec0f29f98328934b08735af900c0e",
+        "hash_xor": 10661528202842970716,
+        "hash_sum": "3224293276050348724257364268"
+      },
+      "RS": {
+        "total_rows": 47453180,
+        "chunk_count": 10,
+        "chunk_configuration": {
+          "command": "chunks",
+          "output": "/Users/mac/src/reddit-zst-benchmark/reddit-zst-to-parquet/out/full-month-benchmark/20260908/RS/chunks",
+          "threads": 18,
+          "memory": 100,
+          "source": "/Users/mac/benchmark-data/reddit-zst-benchmark/data/submissions/RS_2026-05.zst",
+          "sha256": "83f25791b1d7cf8663a5c5cea46d291924adf2e00ba02b450c564711725ffcef",
+          "rows": 5000000
+        },
+        "chunk_conversion_seconds": 367.53516454197234,
+        "chunk_wall_seconds_including_validation": 483.5653102080105,
+        "chunk_throughput_rows_per_second": 129111.94513628878,
+        "chunk_peak_rss_bytes": 67705208832,
+        "chunk_peak_spill_bytes": 0,
+        "chunks_bytes": 28433680725,
+        "best_merge": {
+          "threads": 9,
+          "memory_limit_gb": 64,
+          "repetitions": 3,
+          "median_seconds": 264.0134628750384,
+          "min_seconds": 261.737447374966,
+          "max_seconds": 273.4956166250049,
+          "run_seconds": [
+            261.737447374966,
+            273.4956166250049,
+            264.0134628750384
+          ],
+          "rows_per_second": 179737.72808116348,
+          "peak_rss_bytes": 85072904192,
+          "peak_spill_bytes": 147609174048,
+          "max_swap_growth_bytes": 0
+        },
+        "merge_profiles": [
+          {
+            "threads": 9,
+            "memory_limit_gb": 64,
+            "repetitions": 3,
+            "median_seconds": 264.0134628750384,
+            "min_seconds": 261.737447374966,
+            "max_seconds": 273.4956166250049,
+            "run_seconds": [
+              261.737447374966,
+              273.4956166250049,
+              264.0134628750384
+            ],
+            "rows_per_second": 179737.72808116348,
+            "peak_rss_bytes": 85072904192,
+            "peak_spill_bytes": 147609174048,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 9,
+            "memory_limit_gb": 80,
+            "repetitions": 3,
+            "median_seconds": 286.03421049995814,
+            "min_seconds": 272.3776387919788,
+            "max_seconds": 291.085736042005,
+            "run_seconds": [
+              291.085736042005,
+              272.3776387919788,
+              286.03421049995814
+            ],
+            "rows_per_second": 165900.36526419956,
+            "peak_rss_bytes": 86502244352,
+            "peak_spill_bytes": 142621970464,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 6,
+            "memory_limit_gb": 64,
+            "repetitions": 1,
+            "median_seconds": 289.2746438329923,
+            "min_seconds": 289.2746438329923,
+            "max_seconds": 289.2746438329923,
+            "run_seconds": [
+              289.2746438329923
+            ],
+            "rows_per_second": 164041.96154639905,
+            "peak_rss_bytes": 74168057856,
+            "peak_spill_bytes": 141315559600,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 9,
+            "memory_limit_gb": 48,
+            "repetitions": 1,
+            "median_seconds": 291.6362372090225,
+            "min_seconds": 291.6362372090225,
+            "max_seconds": 291.6362372090225,
+            "run_seconds": [
+              291.6362372090225
+            ],
+            "rows_per_second": 162713.59298189406,
+            "peak_rss_bytes": 63668092928,
+            "peak_spill_bytes": 146425299008,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 6,
+            "memory_limit_gb": 80,
+            "repetitions": 1,
+            "median_seconds": 292.7570171250263,
+            "min_seconds": 292.7570171250263,
+            "max_seconds": 292.7570171250263,
+            "run_seconds": [
+              292.7570171250263
+            ],
+            "rows_per_second": 162090.6664031708,
+            "peak_rss_bytes": 84084998144,
+            "peak_spill_bytes": 124998078496,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 12,
+            "memory_limit_gb": 80,
+            "repetitions": 1,
+            "median_seconds": 304.07663533400046,
+            "min_seconds": 304.07663533400046,
+            "max_seconds": 304.07663533400046,
+            "run_seconds": [
+              304.07663533400046
+            ],
+            "rows_per_second": 156056.64653542687,
+            "peak_rss_bytes": 91064860672,
+            "peak_spill_bytes": 145967943872,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 12,
+            "memory_limit_gb": 64,
+            "repetitions": 1,
+            "median_seconds": 314.8057109169895,
+            "min_seconds": 314.8057109169895,
+            "max_seconds": 314.8057109169895,
+            "run_seconds": [
+              314.8057109169895
+            ],
+            "rows_per_second": 150737.9896691672,
+            "peak_rss_bytes": 89431769088,
+            "peak_spill_bytes": 151886086208,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 9,
+            "memory_limit_gb": 100,
+            "repetitions": 1,
+            "median_seconds": 315.1718459589756,
+            "min_seconds": 315.1718459589756,
+            "max_seconds": 315.1718459589756,
+            "run_seconds": [
+              315.1718459589756
+            ],
+            "rows_per_second": 150562.87739031346,
+            "peak_rss_bytes": 102756073472,
+            "peak_spill_bytes": 120303570976,
+            "max_swap_growth_bytes": 745472000
+          },
+          {
+            "threads": 18,
+            "memory_limit_gb": 80,
+            "repetitions": 1,
+            "median_seconds": 320.61522683297517,
+            "min_seconds": 320.61522683297517,
+            "max_seconds": 320.61522683297517,
+            "run_seconds": [
+              320.61522683297517
+            ],
+            "rows_per_second": 148006.63233852203,
+            "peak_rss_bytes": 84225753088,
+            "peak_spill_bytes": 166134005968,
+            "max_swap_growth_bytes": 0
+          },
+          {
+            "threads": 15,
+            "memory_limit_gb": 80,
+            "repetitions": 1,
+            "median_seconds": 332.2272635839763,
+            "min_seconds": 332.2272635839763,
+            "max_seconds": 332.2272635839763,
+            "run_seconds": [
+              332.2272635839763
+            ],
+            "rows_per_second": 142833.49141213804,
+            "peak_rss_bytes": 99320856576,
+            "peak_spill_bytes": 148211585200,
+            "max_swap_growth_bytes": 0
+          }
+        ],
+        "summed_conversion_and_median_merge_seconds": 631.5486274170107,
+        "final_file": "/Users/mac/src/reddit-zst-benchmark/reddit-zst-to-parquet/out/full-month-benchmark/20260908/final/RS_2026-05.parquet",
+        "final_bytes": 27628616555,
+        "final_sha256": "d0b277b0c8d29e670048ed069da1756fc5a4e2bc0ab2d5ad84cb2002b81e6de9",
+        "hash_xor": 4780898149902701282,
+        "hash_sum": "437689287448745512413075008"
+      }
+    }
+  },
+  "geekbench_7": {
+    "benchmark": "Geekbench",
+    "version": "7.0.0",
+    "installation": "/Applications/Geekbench 7.app",
+    "machine": {
+      "model_id": "Mac17,6",
+      "processor": "Apple M5 Max",
+      "cpu_cores": 18,
+      "gpu_cores": 40,
+      "memory_gib": 128,
+      "os": "macOS 26.6.2 (Build 25G83)"
+    },
+    "repetitions": 1,
+    "cpu": {
+      "single_core_score": 3620,
+      "multi_core_score": 33945,
+      "result_url": "https://browser.geekbench.com/v7/cpu/297118",
+      "uploaded_utc": "2026-09-08T06:55:00Z",
+      "single_core_workloads": [
+        {
+          "name": "File Compression",
+          "score": 3098,
+          "throughput": "440.8 MB/sec"
+        },
+        {
+          "name": "Navigation",
+          "score": 3918,
+          "throughput": "21.6 routes/sec"
+        },
+        {
+          "name": "HTML5 Browser",
+          "score": 3817,
+          "throughput": "47.7 pages/sec"
+        },
+        {
+          "name": "PDF Viewer",
+          "score": 4213,
+          "throughput": "189.2 Mpixels/sec"
+        },
+        {
+          "name": "Photo Library",
+          "score": 3537,
+          "throughput": "12.1 images/sec"
+        },
+        {
+          "name": "Clang",
+          "score": 3989,
+          "throughput": "21.6 Klines/sec"
+        },
+        {
+          "name": "Text Processing",
+          "score": 3524,
+          "throughput": "207.9 pages/sec"
+        },
+        {
+          "name": "Asset Compression",
+          "score": 3455,
+          "throughput": "76.8 MB/sec"
+        },
+        {
+          "name": "HDR",
+          "score": 3335,
+          "throughput": "201.5 Mpixels/sec"
+        },
+        {
+          "name": "Photo Editor",
+          "score": 3226,
+          "throughput": "59.3 images/sec"
+        },
+        {
+          "name": "Ray Tracer",
+          "score": 3011,
+          "throughput": "845.7 Ksamples/sec"
+        },
+        {
+          "name": "Structure from Motion",
+          "score": 4288,
+          "throughput": "77.5 Kpixels/sec"
+        },
+        {
+          "name": "Game Physics",
+          "score": 3597,
+          "throughput": "145.5 FPS"
+        },
+        {
+          "name": "Video Encoder",
+          "score": 3629,
+          "throughput": "132.0 FPS"
+        },
+        {
+          "name": "Audio Encoder",
+          "score": 2755,
+          "throughput": "3.83 Msamples/sec"
+        },
+        {
+          "name": "Video Player",
+          "score": 5197,
+          "throughput": "549.4 FPS"
+        }
+      ],
+      "multi_core_workloads": [
+        {
+          "name": "File Compression",
+          "score": 20575,
+          "throughput": "2.86 GB/sec"
+        },
+        {
+          "name": "Photo Library",
+          "score": 34864,
+          "throughput": "119.5 images/sec"
+        },
+        {
+          "name": "Clang",
+          "score": 44840,
+          "throughput": "242.5 Klines/sec"
+        },
+        {
+          "name": "Text Processing",
+          "score": 31752,
+          "throughput": "1.87 Kpages/sec"
+        },
+        {
+          "name": "Asset Compression",
+          "score": 47151,
+          "throughput": "1.02 GB/sec"
+        },
+        {
+          "name": "HDR",
+          "score": 22334,
+          "throughput": "1.35 Gpixels/sec"
+        },
+        {
+          "name": "Photo Editor",
+          "score": 34419,
+          "throughput": "632.5 images/sec"
+        },
+        {
+          "name": "Ray Tracer",
+          "score": 47622,
+          "throughput": "13.4 Msamples/sec"
+        }
+      ]
+    },
+    "gpu": {
+      "api": "Metal",
+      "score": 238684,
+      "result_url": "https://browser.geekbench.com/v7/gpu/141082",
+      "uploaded_utc": "2026-09-08T06:57:00Z",
+      "workloads": [
+        {
+          "name": "Background Blur",
+          "score": 269980,
+          "throughput": "697.3 images/sec"
+        },
+        {
+          "name": "Face Tracking",
+          "score": 442041,
+          "throughput": "548.2 images/sec"
+        },
+        {
+          "name": "Super Resolution",
+          "score": 610474,
+          "throughput": "1.13 Mimages/sec"
+        },
+        {
+          "name": "Horizon Detection",
+          "score": 205839,
+          "throughput": "7.93 Gpixels/sec"
+        },
+        {
+          "name": "Photo Filter",
+          "score": 209468,
+          "throughput": "3.44 Kpixels/sec"
+        },
+        {
+          "name": "Video Filter",
+          "score": 212778,
+          "throughput": "57.7 Gpixels/sec"
+        },
+        {
+          "name": "RAW",
+          "score": 216469,
+          "throughput": "8.75 Gpixels/sec"
+        },
+        {
+          "name": "Feature Matching",
+          "score": 209283,
+          "throughput": "395.0 Mpixels/sec"
+        },
+        {
+          "name": "Path Tracer",
+          "score": 146571,
+          "throughput": "262.5 Mpixels/sec"
+        },
+        {
+          "name": "Particle Physics",
+          "score": 214156,
+          "throughput": "38394.1 FPS"
+        },
+        {
+          "name": "Fluid Simulation",
+          "score": 150700,
+          "throughput": "2220.6 FPS"
+        }
+      ]
+    },
+    "notes": [
+      "CPU and GPU benchmarks ran sequentially after the full-month conversion and merge benchmarks finished.",
+      "These are single-run scores, not repeated medians.",
+      "The free edition uploaded results to Geekbench Browser.",
+      "Scores and workload measurements were retrieved from the public result pages.",
+      "Upload timestamps have minute precision.",
+      "Private result-claim URLs are excluded from the ZIP copies of the console logs."
+    ]
+  },
+  "conclusions": [
+    "Maximum measured RC chunk throughput used 18M rows, 15 threads, and 80 GB; 16M is the balanced production choice.",
+    "Maximum measured RS chunk throughput used 5M rows, 18 threads, and 100 GB.",
+    "The best RC global merge used 12 threads and 80 GB; the best RS merge used 9 threads and 64 GB.",
+    "More threads or memory were not consistently faster. The 100 GB merge trials caused system swap growth.",
+    "The staged threaded-decoder path remained faster than direct DuckDB Zstandard ingestion.",
+    "All retained outputs passed source hash, row count, schema, content fingerprint, and physical sort-order validation."
+  ]
+}
