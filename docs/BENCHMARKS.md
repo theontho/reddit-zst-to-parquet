@@ -136,6 +136,55 @@ physical sort-order validation. Cross-host fingerprint equality was not
 asserted because the M5 and Linux full-month harnesses used different schema
 projection and fingerprint implementations.
 
+### April-July production conversion
+
+After selecting the M5 profile above, it was used to produce and validate four
+consecutive months of comments and submissions. The compact evidence record is
+[`RC_RS_2026-04_07-m5-production.json`](benchmarks/RC_RS_2026-04_07-m5-production.json).
+It records source and output hashes, row and byte counts, production timings,
+resource telemetry, and hashes of the four imported evidence archives.
+
+The production inventory covers **1,589,365,627 rows** and
+**311,471,013,097 output bytes** (290.08 GiB):
+
+| Dataset | Rows | Output GiB | Output SHA-256 |
+|---|---:|---:|---|
+| RC 2026-04 | 338,589,164 | 42.31 | `e837a3e7...f0a003` |
+| RC 2026-05 | 349,577,451 | 43.33 | `bd4644c9...900c0e` |
+| RC 2026-06 | 347,582,376 | 44.84 | `aa1696e5...06b1801` |
+| RC 2026-07 | 371,198,229 | 60.60 | `3299daef...f8868d` |
+| RS 2026-04 | 44,966,495 | 24.03 | `fc6f5711...b22b51` |
+| RS 2026-05 | 47,453,180 | 25.73 | `d0b277b0...e6de9` |
+| RS 2026-06 | 44,257,470 | 24.13 | `cc0e2fa5...cf7083` |
+| RS 2026-07 | 45,741,262 | 25.10 | `dac90db5...f7e39` |
+
+The May rows reuse the validated outputs and repeated merge measurements from
+the optimization profile above. April, June, and July are single production
+runs, so their times are operational measurements rather than repeat medians:
+
+| Dataset | Chunks | Conversion | Merge | Merge rate | Merge strategy |
+|---|---:|---:|---:|---:|---|
+| RC 2026-04 | 19 | 9m 11s | 6m 51s | 824,732 rows/s | Single global sort |
+| RC 2026-06 | 20 | 10m 00s | 7m 07s | 813,560 rows/s | Single global sort |
+| RC 2026-07 | 21 | 11m 56s | 20m 04s | 308,295 rows/s | 17 author ranges, then ordered concatenation |
+| RS 2026-04 | 9 | 5m 50s | 4m 38s | 161,579 rows/s | Single global sort |
+| RS 2026-06 | 9 | 5m 35s | 4m 32s | 162,614 rows/s | Single global sort |
+| RS 2026-07 | 10 | 5m 48s | 4m 59s | 153,134 rows/s | Single global sort |
+
+RC July exposed a disk-capacity boundary that was not visible in the smaller
+months. A global sort with nine threads and an 80 GB DuckDB limit exhausted its
+**339,889,393,539-byte (316.55 GiB)** spill ceiling. The recovery split the
+complete author keyspace, including null authors, into 17 disjoint ranges,
+sorted each range, and concatenated the already ordered outputs. Range sorting
+took 208.16 seconds and concatenation took 995.88 seconds. Validation then
+confirmed all 371,198,229 rows, the expected fingerprints and SHA-256, and zero
+physical sort violations.
+
+The recovery's measured DuckDB spill peaked at only 9.85 GiB, but that number
+excludes the retained 60.60 GiB of range outputs and the growing 60.60 GiB
+final output. It must not be interpreted as the complete scratch-space
+requirement.
+
 ## Full May 2026 Linux chunk-and-merge run
 
 The complete May comment and submission archives were processed on the Ryzen

@@ -1,0 +1,330 @@
+{
+  "benchmark": "M5 Max April-July 2026 production conversion",
+  "benchmark_date": "2026-09-08",
+  "benchmark_version": 1,
+  "system_profile": {
+    "reference": "RC_RS_2026-05-m5-max-profile.json",
+    "description": "MacBook Pro with Apple M5 Max and 128 GiB unified memory",
+    "note": "The referenced profile remains the canonical repeated optimization benchmark for May. This record adds single-run production evidence for April, June, and July and inventories the reused May outputs."
+  },
+  "source_archives": [
+    {
+      "file": "comment-benchmarks.zip",
+      "sha256": "361a62b1e7a2d22b4cbfbd26471a5b3bc1e633ada8e54671e7f9c883a768aebe",
+      "zip_entries": 1928,
+      "non_appledouble_files": 860,
+      "relocation_manifest_files_verified": 848
+    },
+    {
+      "file": "comment-manifests.zip",
+      "sha256": "8472945a8ccd2f347d9566c7e665be9d143e3c7a5c567f11834079b53a3dfce5",
+      "zip_entries": 12,
+      "non_appledouble_files": 6
+    },
+    {
+      "file": "submission-manifest.zip",
+      "sha256": "3c60af25f315e07c23d2f224b5067206621bd984fa1569cc2bdb650684a7d25a",
+      "zip_entries": 14,
+      "non_appledouble_files": 7
+    },
+    {
+      "file": "submissions-benchmarks.zip",
+      "sha256": "dc24ecb0e8044fc18f1a1e60130117975360c90cd59d1bdac865161e2a366ea9",
+      "zip_entries": 1064,
+      "non_appledouble_files": 436,
+      "relocation_manifest_files_verified": 429
+    }
+  ],
+  "source_evidence": {
+    "local_archive_directory": "out/benchmark-imports/m5-production/20260908",
+    "comment_production_summary_sha256": "a59494a5ad032576ee0aba5e06621aef00e79adee1ac340c2ba4a8b5c894bf09",
+    "comment_chunks_csv_sha256": "026eac020b315255425a4965ef15f920259d565db1a41483f9d3505a7539442b",
+    "comment_merges_csv_sha256": "9bf91a0882e3202dfd77abec2804ae9e02f51f18c7c30c4ae716cebb30501010",
+    "comment_report_sha256": "7bdeb6e626d0d46da34532481d23789eea739c9eecaeb71ef654e1c920209749",
+    "comment_final_inventory_sha256": "79b7bd3606b25fdadbe276de3882f438dd710a2518b3e4c1fd3f952ad626de6d",
+    "submission_final_inventory_sha256": "90dc0fe68267e71bb6d7f8848311df0de87d91bc72951b665caab2d2a65007c5",
+    "archive_path_check": "No absolute or parent-traversal paths found.",
+    "relocation_manifest_check": "Every listed file matched its recorded size and SHA-256."
+  },
+  "configuration": {
+    "sort_order": [
+      "author",
+      "subreddit",
+      "created_utc"
+    ],
+    "parquet_compression": "ZSTD",
+    "comments": {
+      "chunk_rows": 18000000,
+      "chunk_threads": 15,
+      "chunk_memory_gb": 80,
+      "global_merge_threads": 12,
+      "global_merge_memory_gb": 80
+    },
+    "submissions": {
+      "chunk_rows": 5000000,
+      "chunk_threads": 18,
+      "chunk_memory_gb": 100,
+      "merge_threads": 9,
+      "merge_memory_gb": 64
+    }
+  },
+  "totals": {
+    "comment_rows": 1406947220,
+    "submission_rows": 182418407,
+    "rows": 1589365627,
+    "output_bytes": 311471013097
+  },
+  "outputs": [
+    {
+      "dataset": "RC_2026-04",
+      "source_file": "RC_2026-04.zst",
+      "source_bytes": 46375666679,
+      "source_sha256": "6fe95181233eaac8d09571cc61b342fef0e3f85ac8674e0abd874cfd29a25207",
+      "output_file": "RC_2026-04.parquet",
+      "output_bytes": 45430409377,
+      "output_sha256": "e837a3e757e4def4f34311d8954537c727302180109cb0fbae4de7ea75f0a003",
+      "rows": 338589164,
+      "chunk_count": 19,
+      "conversion_seconds": 550.5398555469583,
+      "merge": {
+        "method": "single_global_sort",
+        "seconds": 410.5446564159938,
+        "rows_per_second": 824731.6307946699,
+        "peak_rss_bytes": 90169933824,
+        "peak_spill_bytes": 277726232576
+      },
+      "validation": {
+        "seconds": 51.76626687502721,
+        "schema_columns": 58,
+        "physical_sort_violations": 0,
+        "hash_xor": 11734835690641851945,
+        "hash_sum": "3122853738008585030392317277"
+      },
+      "provenance": "new_single_production_run"
+    },
+    {
+      "dataset": "RC_2026-05",
+      "source_file": "RC_2026-05.zst",
+      "source_bytes": 47844685635,
+      "source_sha256": "b780399265b98536a4dd29cb1605c8b607fd4297200b900047e2aace6ea6e4cc",
+      "output_file": "RC_2026-05.parquet",
+      "output_bytes": 46525061305,
+      "output_sha256": "bd4644c91ecaf4aa8876f451d03ef124f26ec0f29f98328934b08735af900c0e",
+      "rows": 349577451,
+      "chunk_count": 20,
+      "conversion_seconds": 566.9972345021088,
+      "merge": {
+        "method": "single_global_sort",
+        "seconds": 324.60770379099995,
+        "seconds_statistic": "median_of_three",
+        "rows_per_second": 1076922.8423028337,
+        "peak_rss_bytes": 88365957120,
+        "peak_spill_bytes": 287208996864
+      },
+      "validation": {
+        "schema_columns": 58,
+        "physical_sort_violations": 0,
+        "hash_xor": 10661528202842970716,
+        "hash_sum": "3224293276050348724257364268"
+      },
+      "provenance": "reused_from_RC_RS_2026-05-m5-max-profile.json"
+    },
+    {
+      "dataset": "RC_2026-06",
+      "source_file": "RC_2026-06.zst",
+      "source_bytes": 48180477828,
+      "source_sha256": "2bb00d6677f32cd4974d2cc1f4ae0f9d39c63aed61dedfd2cfe663dbf070b912",
+      "output_file": "RC_2026-06.parquet",
+      "output_bytes": 48151947764,
+      "output_sha256": "aa1696e5964d79c4958c68d84f86d1c3c3b7a3104c021341a0b13a9d606b1801",
+      "rows": 347582376,
+      "chunk_count": 20,
+      "conversion_seconds": 600.3947027099202,
+      "merge": {
+        "method": "single_global_sort",
+        "seconds": 427.2363820829778,
+        "rows_per_second": 813559.8712482604,
+        "peak_rss_bytes": 90124156928,
+        "peak_spill_bytes": 301251788800
+      },
+      "validation": {
+        "seconds": 55.62448816699907,
+        "schema_columns": 58,
+        "physical_sort_violations": 0,
+        "hash_xor": 5328331385618902524,
+        "hash_sum": "3206013737584375941256782778"
+      },
+      "provenance": "new_single_production_run"
+    },
+    {
+      "dataset": "RC_2026-07",
+      "source_file": "RC_2026-07.zst",
+      "source_bytes": 57061907266,
+      "source_sha256": "9a6d5fc8d75fd39b219a7641e16d2a7519cab29e2b93254075859481e5bfc958",
+      "output_file": "RC_2026-07.parquet",
+      "output_bytes": 65069286262,
+      "output_sha256": "3299daef904ea35b987a80ac574f150ffac49afef7c69ad131273a3e5ef8868d",
+      "rows": 371198229,
+      "chunk_count": 21,
+      "conversion_seconds": 715.8832932517398,
+      "merge": {
+        "method": "17_author_ranges_then_ordered_concatenation",
+        "seconds": 1204.0352550427779,
+        "rows_per_second": 308295.1495359758,
+        "peak_rss_bytes": 92900556800,
+        "peak_spill_bytes": 10580361216
+      },
+      "validation": {
+        "seconds": 61.33962041704217,
+        "schema_columns": 58,
+        "physical_sort_violations": 0,
+        "hash_xor": 7506277162580412257,
+        "hash_sum": "3423785853414634856055441781"
+      },
+      "provenance": "new_single_production_run_with_recovery"
+    },
+    {
+      "dataset": "RS_2026-04",
+      "source_file": "RS_2026-04.zst",
+      "source_bytes": 22168941711,
+      "source_sha256": "b8d5e03a1667e2833a0b4ab47c0b6c94c5d0e3e010fca1c59943ac95e0e4e635",
+      "output_file": "RS_2026-04.parquet",
+      "output_bytes": 25800773842,
+      "output_sha256": "fc6f57111faf309457bd2355b59a3ac3d96a18e31f419833cdcc97a151b22b51",
+      "rows": 44966495,
+      "chunk_count": 9,
+      "conversion_seconds": 349.69127216690686,
+      "merge": {
+        "method": "single_global_sort",
+        "seconds": 278.2941676249611,
+        "peak_rss_bytes": 80821403648,
+        "peak_spill_bytes": 138969112592
+      },
+      "validation": {
+        "schema_columns": 151,
+        "physical_sort_violations": 0,
+        "hash_xor": 2263904719256051355,
+        "hash_sum": "414765260799298058086845033"
+      },
+      "provenance": "new_single_production_run"
+    },
+    {
+      "dataset": "RS_2026-05",
+      "source_file": "RS_2026-05.zst",
+      "source_bytes": 23823383434,
+      "source_sha256": "83f25791b1d7cf8663a5c5cea46d291924adf2e00ba02b450c564711725ffcef",
+      "output_file": "RS_2026-05.parquet",
+      "output_bytes": 27628616555,
+      "output_sha256": "d0b277b0c8d29e670048ed069da1756fc5a4e2bc0ab2d5ad84cb2002b81e6de9",
+      "rows": 47453180,
+      "chunk_count": 10,
+      "conversion_seconds": 367.53516454197234,
+      "merge": {
+        "method": "single_global_sort",
+        "seconds": 264.0134628750384,
+        "seconds_statistic": "median_of_three",
+        "rows_per_second": 179737.72808116348,
+        "peak_rss_bytes": 85072904192,
+        "peak_spill_bytes": 147609174048
+      },
+      "validation": {
+        "schema_columns": 151,
+        "physical_sort_violations": 0,
+        "hash_xor": 4780898149902701282,
+        "hash_sum": "437689287448745512413075008"
+      },
+      "provenance": "reused_from_RC_RS_2026-05-m5-max-profile.json"
+    },
+    {
+      "dataset": "RS_2026-06",
+      "source_file": "RS_2026-06.zst",
+      "source_bytes": 22197371466,
+      "source_sha256": "4aa6978212825c5ae81d32517ed88c7fad6abc2682bac9c572a42592e56cf781",
+      "output_file": "RS_2026-06.parquet",
+      "output_bytes": 25911368012,
+      "output_sha256": "cc0e2fa5b85c20425f9e331a92d010d945578aab7256ea961585b15c06cf7083",
+      "rows": 44257470,
+      "chunk_count": 9,
+      "conversion_seconds": 334.59193321008934,
+      "merge": {
+        "method": "single_global_sort",
+        "seconds": 272.1634144579875,
+        "peak_rss_bytes": 81053794304,
+        "peak_spill_bytes": 129536970800
+      },
+      "validation": {
+        "schema_columns": 151,
+        "physical_sort_violations": 0,
+        "hash_xor": 1330166910659052190,
+        "hash_sum": "408217034681441951296652792"
+      },
+      "provenance": "new_single_production_run"
+    },
+    {
+      "dataset": "RS_2026-07",
+      "source_file": "RS_2026-07.zst",
+      "source_bytes": 23210654436,
+      "source_sha256": "1b52c5282a4226325bb4e866a8f626224659ed3d92b1d601a4b365a8e41e0647",
+      "output_file": "RS_2026-07.parquet",
+      "output_bytes": 26953549980,
+      "output_sha256": "dac90db50e61d05c0c86dcc2a2a04eeef140d18e91a7524034677428f76f7e39",
+      "rows": 45741262,
+      "chunk_count": 10,
+      "conversion_seconds": 347.6034247499774,
+      "merge": {
+        "method": "single_global_sort",
+        "seconds": 298.7003542499733,
+        "peak_rss_bytes": 80235790336,
+        "peak_spill_bytes": 133958008832
+      },
+      "validation": {
+        "schema_columns": 151,
+        "physical_sort_violations": 0,
+        "hash_xor": 16538244224205039744,
+        "hash_sum": "421886015473660871329552072"
+      },
+      "provenance": "new_single_production_run"
+    }
+  ],
+  "july_comment_recovery": {
+    "expanded_jsonl_bytes": 795866871609,
+    "chunk_parquet_bytes": 69920401250,
+    "initial_disk_estimate": "A conservative free-space estimate prevented the first global-sort attempt.",
+    "failed_global_merge": {
+      "threads": 9,
+      "memory_gb": 80,
+      "max_temp_directory_size_bytes": 339889393539,
+      "failure": "DuckDB could not offload another 64 KiB block without exceeding max_temp_directory_size."
+    },
+    "successful_merge": {
+      "range_count": 17,
+      "includes_null_author_range": true,
+      "boundary_sample_authors": 20000,
+      "boundary_sample_seed": 20260908,
+      "planning_seconds": 5.402279041998554,
+      "range_sort_seconds": 208.15818916779244,
+      "concatenation_seconds": 995.8770658749854,
+      "total_seconds": 1204.0352550427779,
+      "range_output_bytes": 65067474127,
+      "final_output_bytes": 65069286262,
+      "peak_rss_bytes": 92900556800,
+      "peak_duckdb_spill_bytes": 10580361216
+    },
+    "storage_accounting_note": "The measured DuckDB spill excludes retained range outputs and the growing final output, so it is not the total temporary-storage footprint."
+  },
+  "validation": {
+    "all_eight_outputs_have_recorded_source_and_output_sha256": true,
+    "all_eight_outputs_have_recorded_row_and_byte_counts": true,
+    "all_eight_outputs_are_globally_sorted": true,
+    "physical_sort_violations": 0,
+    "may_validation_reference": "RC_RS_2026-05-m5-max-profile.json"
+  },
+  "limitations": [
+    "April, June, and July production measurements are single runs, not repeated medians.",
+    "Other host workloads were not isolated.",
+    "Validation time is separate from conversion and merge time.",
+    "The May outputs and measurements were reused from the previously tracked May benchmark rather than rerun.",
+    "Measured DuckDB spill excludes persistent intermediate Parquet files and output growth.",
+    "Historical absolute paths remain in the hashed raw evidence but are intentionally omitted from this normalized record."
+  ]
+}

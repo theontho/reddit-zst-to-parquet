@@ -349,6 +349,31 @@ Complete conversion work plus the median winning merge took 14.87 minutes for
 hosts used intentionally different resource profiles. Treat these as
 machine-level capacity results, not per-core architecture comparisons.
 
+The April-July production run added an important disk-boundary lesson. RC
+July's 371.2 million rows could not complete as one global sort when DuckDB's
+temporary directory was capped at 316.55 GiB, even with 128 GiB of unified
+memory and an 80 GB DuckDB memory limit. The previously validated chunk files
+remained useful: the merge was recovered by partitioning the complete sort
+keyspace into 17 disjoint author ranges, sorting each range independently, and
+concatenating them in key order.
+
+For future full-month merges:
+
+1. Keep validated chunk Parquet files until the final output has passed
+   row-count, fingerprint, physical-order, and SHA-256 validation.
+2. Prefer the single global merge while its estimated scratch requirement fits
+   comfortably within available disk.
+3. When the global merge is disk-bound, switch to disjoint leading-key ranges
+   that include a dedicated null range, then concatenate the sorted range
+   outputs in key order.
+4. Budget storage for DuckDB spill, retained range outputs, and the growing
+   final output independently. DuckDB's reported spill alone is not total
+   scratch usage.
+
+This recovery trades throughput for a bounded failure domain and preserves
+global `author, subreddit, created_utc` order without restarting the expensive
+chunk conversion.
+
 ## Schema and data robustness
 
 - Use a fixed schema rather than inferring every chunk independently.
