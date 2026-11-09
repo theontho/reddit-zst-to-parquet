@@ -19,6 +19,7 @@ import pyarrow.parquet as pq
 from benchmarks.conversion import (
     SORT_KEYS,
     configure_connection,
+    fixed_columns,
     infer_raw_schema,
     normalized_select,
     sha256_file,
@@ -55,6 +56,10 @@ class Metrics:
         self.minimum_available = psutil.virtual_memory().available
         self.error: Exception | None = None
 
+    def process_io(self) -> dict[str, int] | None:
+        counters = getattr(self.process, "io_counters", None)
+        return dict(counters()._asdict()) if counters is not None else None
+
     def sample(self) -> None:
         memory = psutil.virtual_memory()
         spill = 0
@@ -77,7 +82,7 @@ class Metrics:
             "available_memory_bytes": memory.available,
             "swap": psutil.swap_memory()._asdict(),
             "process_cpu": self.process.cpu_times()._asdict(),
-            "process_io": self.process.io_counters()._asdict(),
+            "process_io": self.process_io(),
             "load_average": os.getloadavg(),
             "disk_free_bytes": shutil.disk_usage(self.root).free,
         }
@@ -94,7 +99,7 @@ class Metrics:
     def __enter__(self) -> Metrics:
         self.started = time.monotonic()
         self.cpu_start = self.process.cpu_times()
-        self.io_start = self.process.io_counters()
+        self.io_start = self.process_io()
         self.samples = (self.root / "telemetry.jsonl").open("a", encoding="utf-8")
         self.sample()
         self.thread = threading.Thread(target=self.monitor, daemon=True)
@@ -108,7 +113,7 @@ class Metrics:
         self.sample()
         self.samples.close()
         cpu = self.process.cpu_times()
-        io = self.process.io_counters()
+        io = self.process_io()
         self.result = {
             "phase": self.name,
             "seconds": time.monotonic() - self.started,
@@ -117,8 +122,12 @@ class Metrics:
             "minimum_available_memory_bytes": self.minimum_available,
             "cpu_user_seconds": cpu.user - self.cpu_start.user,
             "cpu_system_seconds": cpu.system - self.cpu_start.system,
-            "read_bytes": io.read_bytes - self.io_start.read_bytes,
-            "write_bytes": io.write_bytes - self.io_start.write_bytes,
+            "read_bytes": io["read_bytes"] - self.io_start["read_bytes"]
+            if io is not None and self.io_start is not None
+            else None,
+            "write_bytes": io["write_bytes"] - self.io_start["write_bytes"]
+            if io is not None and self.io_start is not None
+            else None,
             "success": exc_type is None and self.error is None,
         }
         with (self.root / "phases.jsonl").open("a", encoding="utf-8") as output:
@@ -146,7 +155,7 @@ def connection(root: Path, threads: int, memory: int, profile: str | None = None
 
 def canonical_projection(raw_schema: list[tuple[str, str]], master: list[str]) -> str:
     present = {name for name, _ in raw_schema}
-    projection = normalized_select(raw_schema, master)
+    projection = normalized_select(raw_schema, master, strict=True)
     for name in master:
         if name not in present:
             kind = (
@@ -155,7 +164,12 @@ def canonical_projection(raw_schema: list[tuple[str, str]], master: list[str]) -
                 else ("BOOLEAN" if name in BOOLEAN_COLUMNS else "VARCHAR")
             )
             projection += f", CAST(NULL AS {kind}) AS {sql_identifier(name)}"
-    columns = ", ".join(sql_identifier(name) for name in [*master, "extra_json"])
+    columns = ", ".join(
+        f"CAST({sql_identifier(name)} AS VARCHAR) AS {sql_identifier(name)}"
+        if name == "extra_json"
+        else sql_identifier(name)
+        for name in [*master, "extra_json"]
+    )
     return f"SELECT {columns} FROM (SELECT {projection} FROM source_rows)"
 
 
@@ -247,12 +261,14 @@ def create_chunks(args: argparse.Namespace, root: Path, state: dict) -> None:
                     memory_limit_gb=args.memory_gb,
                     spill_directory=root / "scratch",
                     max_temp_bytes=int(shutil.disk_usage(root).free * 0.75),
+                    strict=True,
                 )
                 projection = canonical_projection(raw_schema, master)
                 with connection(root, args.threads, args.memory_gb, f"chunk-{index:05d}") as con:
                     con.execute(
                         f"COPY (WITH source_rows AS (SELECT * FROM read_json({sql_string(jsonl)}, "
-                        f"format='newline_delimited', union_by_name=true, ignore_errors=true, "
+                        f"columns={fixed_columns(raw_schema)}, "
+                        f"format='newline_delimited', ignore_errors=false, "
                         f"maximum_object_size={DUCKDB_MAXIMUM_OBJECT_SIZE})) "
                         f"{projection} ORDER BY author, subreddit, created_utc) TO {sql_string(partial)} "
                         f"(FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE {args.row_group_size})"
@@ -330,7 +346,13 @@ def merge_chunks(args: argparse.Namespace, root: Path, state: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--expected-source-sha256", required=True)
+    hashes = parser.add_mutually_exclusive_group(required=True)
+    hashes.add_argument("--expected-source-sha256")
+    hashes.add_argument(
+        "--record-source-sha256",
+        action="store_true",
+        help="Record the initial hash for an externally verified source; enforce it on resume.",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--chunk-rows", type=int, required=True)
     parser.add_argument("--threads", type=int, default=4)
@@ -364,7 +386,7 @@ def main() -> None:
         state_path = root / "state.json"
         with Metrics(root, "source-hash"):
             actual_hash = sha256_file(args.source)
-        if actual_hash != args.expected_source_sha256.lower():
+        if args.expected_source_sha256 and actual_hash != args.expected_source_sha256.lower():
             raise ValueError("Source SHA-256 mismatch")
         if state_path.exists():
             state = json.loads(state_path.read_text())
@@ -389,6 +411,15 @@ def main() -> None:
         if args.stage in {"all", "chunks"}:
             create_chunks(args, root, state)
         if args.stage in {"all", "merge"}:
+            if state.get("merge_complete"):
+                saved = state["output"]
+                current = inspect(Path(saved["path"]), root, args.threads, args.merge_memory_gb)
+                for key in ("rows", "fingerprint_xor", "fingerprint_sum", "non_null_counts", "bytes"):
+                    if current[key] != saved[key]:
+                        raise ValueError(f"Completed output changed: {key}")
+                if current["schema"] != [tuple(item) for item in saved["schema"]]:
+                    raise ValueError("Completed output schema changed")
+                verify_order(Path(saved["path"]))
             merge_chunks(args, root, state)
 
 

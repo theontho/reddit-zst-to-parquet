@@ -2,12 +2,14 @@ import hashlib
 import json
 import sys
 
+import duckdb
+import psutil
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 import zstandard
 
-from benchmarks.full_pipeline import main, verify_order
+from benchmarks.full_pipeline import Metrics, main, verify_order
 from benchmarks.merge_tuning import main as tuning_main
 
 
@@ -69,3 +71,95 @@ def test_order_checker_rejects_bad_sort(tmp_path):
     pq.write_table(pa.table({"author": ["z", "a"], "subreddit": ["x", "x"], "created_utc": [1, 2]}), path)
     with pytest.raises(RuntimeError, match="sort violation"):
         verify_order(path)
+
+
+def test_metrics_without_platform_process_io_counters(tmp_path, monkeypatch):
+    monkeypatch.delattr(psutil.Process, "io_counters", raising=False)
+    with Metrics(tmp_path, "portable") as metrics:
+        pass
+    assert metrics.result["read_bytes"] is None
+    assert metrics.result["write_bytes"] is None
+    sample = json.loads((tmp_path / "telemetry.jsonl").read_text().splitlines()[0])
+    assert sample["process_io"] is None
+
+
+def test_record_hash_preserves_edit_timestamps_and_nested_extras(tmp_path, monkeypatch):
+    rows = [
+        {
+            "author": "z",
+            "subreddit": "s",
+            "created_utc": 1,
+            "id": "a",
+            "edited": 1720000000,
+            "novel_field": {"array": [1, False]},
+        },
+        {"author": "a", "subreddit": "s", "created_utc": 2, "id": "b", "edited": False, "title": "plain text"},
+    ]
+    source = tmp_path / "RS_fixture.zst"
+    source.write_bytes(
+        zstandard.ZstdCompressor().compress(("\n".join(json.dumps(row) for row in rows) + "\n").encode())
+    )
+    output = tmp_path / "out"
+    arguments = [
+        "full_pipeline",
+        "--source",
+        str(source),
+        "--record-source-sha256",
+        "--output-dir",
+        str(output),
+        "--chunk-rows",
+        "1",
+        "--threads",
+        "1",
+        "--memory-gb",
+        "1",
+        "--merge-memory-gb",
+        "1",
+    ]
+    monkeypatch.setattr(sys, "argv", arguments)
+    main()
+    result = json.loads((output / "result.json").read_text())
+    converted = pq.read_table(result["output"]["path"]).to_pylist()
+    assert [row["edited"] for row in converted] == [0, 1720000000]
+    assert converted[0]["title"] == "plain text"
+    assert json.loads(converted[1]["extra_json"])["novel_field"] == {"array": [1, False]}
+    source.write_bytes(zstandard.ZstdCompressor().compress(b'{"id":"different"}\n'))
+    with pytest.raises(ValueError, match="Resume configuration/source mismatch"):
+        main()
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        b'{"author":"a","id":"a"}\nnot valid JSON\n',
+        b'{"author":"a","id":"a","score":"not an integer"}\n',
+    ],
+)
+def test_invalid_data_is_not_silently_dropped_or_nulled(tmp_path, monkeypatch, data):
+    source = tmp_path / "RC_fixture.zst"
+    source.write_bytes(zstandard.ZstdCompressor().compress(data))
+    output = tmp_path / "out"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "full_pipeline",
+            "--source",
+            str(source),
+            "--record-source-sha256",
+            "--output-dir",
+            str(output),
+            "--chunk-rows",
+            "10",
+            "--threads",
+            "1",
+            "--memory-gb",
+            "1",
+            "--merge-memory-gb",
+            "1",
+        ],
+    )
+    with pytest.raises(duckdb.Error):
+        main()
+    assert source.is_file()
+    assert not (output / "result.json").exists()
