@@ -143,6 +143,7 @@ def infer_raw_schema(
     memory_limit_gb: int,
     spill_directory: Path,
     max_temp_bytes: int,
+    strict: bool = False,
 ) -> list[tuple[str, str]]:
     compression = ", compression='zstd'" if compressed else ""
     with duckdb.connect(":memory:") as connection:
@@ -153,6 +154,19 @@ def infer_raw_schema(
             spill_directory=spill_directory,
             max_temp_bytes=max_temp_bytes,
         )
+        if strict:
+            rows = connection.execute(
+                f"""
+                SELECT DISTINCT unnest(json_keys(json)) AS name
+                FROM read_ndjson_objects(
+                    {sql_string(source)}, ignore_errors=false,
+                    maximum_object_size={DUCKDB_MAXIMUM_OBJECT_SIZE}
+                    {compression}
+                )
+                ORDER BY name
+                """
+            ).fetchall()
+            return [(str(row[0]), "JSON") for row in rows]
         rows = connection.execute(
             f"""
             DESCRIBE SELECT * FROM read_json(
@@ -169,29 +183,34 @@ def infer_raw_schema(
     return [(str(row[0]), str(row[1])) for row in rows]
 
 
-def normalized_select(raw_schema: Sequence[tuple[str, str]], master_columns: Sequence[str]) -> str:
+def normalized_select(
+    raw_schema: Sequence[tuple[str, str]], master_columns: Sequence[str], *, strict: bool = False
+) -> str:
     raw_names = {name for name, _ in raw_schema}
+    json_names = {name for name, kind in raw_schema if kind.upper() == "JSON"}
     selections: list[str] = []
+    cast = "CAST" if strict else "TRY_CAST"
     for column in master_columns:
         if column not in raw_names:
             continue
         identifier = sql_identifier(column)
+        text = f"json_extract_string({identifier}, '$')" if column in json_names else identifier
         if column == "edited":
             selections.append(
-                """
+                f"""
                 CASE
-                    WHEN try_cast(edited AS BOOLEAN) IS TRUE THEN 1
-                    WHEN try_cast(edited AS BOOLEAN) IS FALSE THEN 0
-                    ELSE try_cast(edited AS BIGINT)
+                    WHEN lower(CAST({text} AS VARCHAR)) = 'true' THEN 1
+                    WHEN lower(CAST({text} AS VARCHAR)) = 'false' THEN 0
+                    ELSE {cast}({text} AS BIGINT)
                 END AS edited
                 """.strip()
             )
         elif column in BIGINT_COLUMNS:
-            selections.append(f"TRY_CAST({identifier} AS BIGINT) AS {identifier}")
+            selections.append(f"{cast}({identifier} AS BIGINT) AS {identifier}")
         elif column in BOOLEAN_COLUMNS:
-            selections.append(f"TRY_CAST({identifier} AS BOOLEAN) AS {identifier}")
+            selections.append(f"{cast}({identifier} AS BOOLEAN) AS {identifier}")
         else:
-            selections.append(f"TRY_CAST({identifier} AS VARCHAR) AS {identifier}")
+            selections.append(f"{cast}({text} AS VARCHAR) AS {identifier}")
 
     master_names = set(master_columns)
     extras = [name for name, _ in raw_schema if name not in master_names]

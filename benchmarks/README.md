@@ -24,6 +24,17 @@ decompression must still scan the preceding compressed stream once. Successful
 chunks and final outputs are atomically published. Sources and retained chunks
 are never deleted. Do not modify retained chunks between invocations.
 
+For sources already verified independently (for example, by BitTorrent piece
+hashes), `--record-source-sha256` can replace `--expected-source-sha256`. It
+records the first source hash and still requires an identical source on resume.
+The full pipeline rejects malformed JSON and failed type conversions rather
+than dropping records or silently replacing values with NULL. A streaming scan
+discovers every chunk's complete set of fields without whole-chunk type
+inference; explicit JSON-typed input columns preserve nested JSON and newly
+appearing fields. Boolean `edited` flags become 0/1; numeric edit timestamps remain
+timestamps. Source deletion, if desired, must be coordinated separately and only
+after the final verified output is durable.
+
 The Linux profile uses four physical cores, 24 decimal GB for chunk conversion,
 16 GB for the much larger merge, and local NVMe scratch capped at 75% of currently
 free space. The lower merge memory limit leaves headroom for allocations outside
@@ -36,7 +47,7 @@ memory headroom. No system power, antivirus, or filesystem settings are changed.
 Every chunk uses the master column order, normalizes values with the existing
 benchmark helper, pads missing canonical columns, sorts by
 `author, subreddit, created_utc`, and writes ZSTD Parquet with a 100,000-row-group
-request. Raw JSON types are inferred per chunk, as in the production engine, to
+request. Raw fields are discovered per chunk and normalized from JSON to
 accommodate schema changes through the month. Canonical output schema equality
 is enforced before merging without `union_by_name` schema reconciliation.
 The source hash, source line count, per-column non-null counts, full-row XOR and
@@ -50,6 +61,8 @@ process CPU time, RSS, I/O counters, sampled scratch high-water mark, available
 memory, swap, load, and disk space. I/O counters are process counters, not NVMe
 hardware bytes; sampled peaks can miss sub-second spikes. Full runs are single
 observations, not repeated medians.
+On platforms without per-process I/O counters, including macOS, those telemetry
+fields are explicitly `null`; conversion and all data-integrity checks still run.
 
 After chunk creation, `python -m benchmarks.merge_tuning --dataset-dir <dir>`
 compares the old single-thread merge against four threads on the first four
